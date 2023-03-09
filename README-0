@@ -1,8 +1,5 @@
 Simple Python Chess
 -------------------
-Author: Liudmil Mitev
-E-Mail: liudmil.mitev@gmail.com
--------------------
 
 A simple python chess implementation, a learning project.
 Turns out that programming a chess game is no trivial task,
