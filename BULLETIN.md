@@ -1,3 +1,2 @@
-Known memory leaks and bugs: 15
+Currently working on Milvus Integration.
 Documentation: pending
-Container optimization: pending
