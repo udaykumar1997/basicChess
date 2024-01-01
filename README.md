@@ -1,2 +1,5 @@
 # basicChess
- test-1
+
+A simple python chess implementation.
+
+Uses TkInter for GUI.
