@@ -96,10 +96,35 @@ def for_ingestion_pipeline(single_line_paragraph):
 
   results = programatic_taxonomy_detection(single_line_paragraph, custom_startup_taxonomy)
   for result in results:
-    temp_text = result['Text'] + " (" + result['Type'] + ")"
-    # replace all occurances of single and double quotes
-    temp_text = temp_text.replace("'", "")
-    entities.append(temp_text)
+    entity_text_temp = result['Text']
+    entity_type_temp = result['Type']
+
+    # if entity_text_temp is plural, convert it to singular
+    if p.singular_noun(entity_text_temp):
+      entity_text_temp = p.singular_noun(entity_text_temp)
+
+    # remove any leading or trailing whitespaces
+    entity_text_temp = entity_text_temp.strip()
+
+    # remove any leading or trailing single or double quotes
+    entity_text_temp = entity_text_temp.strip("'")
+    entity_text_temp = entity_text_temp.strip('"')
+
+    entity_text_with_type = entity_text_temp + " (" + entity_type_temp + ")"
+    # entity_text_with_type = entity_text_with_type.replace("'", "") # replace all occurances of single and double quotes
+    entities.append(entity_text_with_type)
+
+    if entity_text_temp not in entity_text_only:
+      entity_text_only.append(entity_text_temp)
+
+    if entity_type_temp not in entity_type_only:
+      entity_type_only.append(entity_type_temp)
+    
+    if entity_type_temp in cannonical_map:
+      if entity_text_temp not in cannonical_map[entity_type_temp]:
+        cannonical_map[entity_type_temp].append(entity_text_temp)
+    else:
+      cannonical_map[entity_type_temp] = [entity_text_temp]
 
   entities = list(set(entities))
   response = {"Entities": entities, "EntityTextOnly": entity_text_only, "EntityTypeOnly": entity_type_only, "CannonicalMap": cannonical_map}
