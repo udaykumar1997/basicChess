@@ -75,7 +75,8 @@ def for_ingestion_pipeline(single_line_paragraph):
     entity_text_temp = entity.text
     entity_type_temp = entity.labels[0].value
 
-    # reduce entity_type_temp to lowercase
+    # reduce both entity_text_temp and entity_type_temp to lowercase
+    entity_text_temp = entity_text_temp.lower()
     entity_type_temp = entity_type_temp.lower()
 
     # if entity_text_temp is plural, convert it to singular
@@ -110,7 +111,8 @@ def for_ingestion_pipeline(single_line_paragraph):
     entity_text_temp = result['Text']
     entity_type_temp = result['Type']
 
-    # reduce entity_type_temp to lowercase
+    # reduce both entity_text_temp and entity_type_temp to lowercase
+    entity_text_temp = entity_text_temp.lower()
     entity_type_temp = entity_type_temp.lower()
 
     # if entity_text_temp is plural, convert it to singular
