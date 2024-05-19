@@ -58,12 +58,14 @@ def for_doccano_pre_tagging(single_line_paragraph):
 def for_ingestion_pipeline(single_line_paragraph):
   sentence = Sentence(single_line_paragraph)
   tagger.predict(sentence)
-  entities = []
+  entities, entity_text_only, entity_type_only = [], [], []
   for entity in sentence.get_spans('ner'):
     temp_text = entity.text + " (" + entity.labels[0].value + ")"
     # replace all occurances of single and double quotes
     temp_text = temp_text.replace("'", "")
     entities.append(temp_text)
+    entity_text_only.append(entity.text)
+    entity_type_only.append(entity.labels[0].value)
 
   results = programatic_taxonomy_detection(single_line_paragraph, custom_startup_taxonomy)
   for result in results:
@@ -73,7 +75,7 @@ def for_ingestion_pipeline(single_line_paragraph):
     entities.append(temp_text)
 
   entities = list(set(entities))
-  response = {"Entities": entities}
+  response = {"Entities": entities, "EntityTextOnly": entity_text_only, "EntityTypeOnly": entity_type_only}
   return response
 
 app = Flask(__name__)
