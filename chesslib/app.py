@@ -66,29 +66,40 @@ def for_doccano_pre_tagging(single_line_paragraph):
   response = {"text": single_line_paragraph, "label": entities}
   return response
 
+def standardize_entity_text(entity_text, entity_type):
+  # reduce both entity_text and entity_type to lowercase
+  entity_text = entity_text.lower()
+  entity_type = entity_type.lower()
+
+  # if entity_text is plural, convert it to singular
+  if p.singular_noun(entity_text):
+    entity_text = p.singular_noun(entity_text)
+
+  # remove any leading or trailing whitespaces
+  entity_text = entity_text.strip()
+
+  # remove any leading or trailing single or double quotes
+  entity_text = entity_text.strip("'")
+  entity_text = entity_text.strip('"')
+
+  # remove any occurance of single or double quotes
+  entity_text = entity_text.replace("'", "")
+  entity_text = entity_text.replace('"', '')
+
+  return entity_text, entity_type
+
 def for_ingestion_pipeline(single_line_paragraph):
-  sentence = Sentence(single_line_paragraph)
-  tagger.predict(sentence)
   entities, entity_text_only, entity_type_only = [], [], []
   cannonical_map = {}
+
+  # get entities from Vanilla Flair (ner-ontonotes-large model)
+  sentence = Sentence(single_line_paragraph)
+  tagger.predict(sentence)
   for entity in sentence.get_spans('ner'):
     entity_text_temp = entity.text
     entity_type_temp = entity.labels[0].value
 
-    # reduce both entity_text_temp and entity_type_temp to lowercase
-    entity_text_temp = entity_text_temp.lower()
-    entity_type_temp = entity_type_temp.lower()
-
-    # if entity_text_temp is plural, convert it to singular
-    if p.singular_noun(entity_text_temp):
-      entity_text_temp = p.singular_noun(entity_text_temp)
-
-    # remove any leading or trailing whitespaces
-    entity_text_temp = entity_text_temp.strip()
-
-    # remove any leading or trailing single or double quotes
-    entity_text_temp = entity_text_temp.strip("'")
-    entity_text_temp = entity_text_temp.strip('"')
+    entity_text_temp, entity_type_temp = standardize_entity_text(entity_text_temp, entity_type_temp)
 
     entity_text_with_type = entity_text_temp + " (" + entity_type_temp + ")"
     # entity_text_with_type = entity_text_with_type.replace("'", "") # replace all occurances of single and double quotes
@@ -111,23 +122,9 @@ def for_ingestion_pipeline(single_line_paragraph):
     entity_text_temp = result['Text']
     entity_type_temp = result['Type']
 
-    # reduce both entity_text_temp and entity_type_temp to lowercase
-    entity_text_temp = entity_text_temp.lower()
-    entity_type_temp = entity_type_temp.lower()
-
-    # if entity_text_temp is plural, convert it to singular
-    if p.singular_noun(entity_text_temp):
-      entity_text_temp = p.singular_noun(entity_text_temp)
-
-    # remove any leading or trailing whitespaces
-    entity_text_temp = entity_text_temp.strip()
-
-    # remove any leading or trailing single or double quotes
-    entity_text_temp = entity_text_temp.strip("'")
-    entity_text_temp = entity_text_temp.strip('"')
+    entity_text_temp, entity_type_temp = standardize_entity_text(entity_text_temp, entity_type_temp)
 
     entity_text_with_type = entity_text_temp + " (" + entity_type_temp + ")"
-    # entity_text_with_type = entity_text_with_type.replace("'", "") # replace all occurances of single and double quotes
     entities.append(entity_text_with_type)
 
     if entity_text_temp not in entity_text_only:
@@ -176,6 +173,9 @@ def doccano_pre_annotation():
 def ingestion_pipeline():
   data = request.get_json()
   text = data['text']
+  # remove any single or double quotes from the text
+  text = text.replace("\'", "")
+  text = text.replace('\"', "")
   recognized_entities = for_ingestion_pipeline(text) # for ingestion pipeline
   recognized_entities = jsonify(recognized_entities) # essential because returning a dictionary directly from a Flask route does not automatically convert it to a JSON response
 
