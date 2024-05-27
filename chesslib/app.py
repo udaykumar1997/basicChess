@@ -27,10 +27,11 @@ import torch
 # tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
 # model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=3)  # 2 labels for binary classification
 
+hf_token = userdata.get('HF_TOKEN')
 # url="https://huggingface.co/udaykumar97/OASIS_RoBERTa_for_ERR_one"
 url="udaykumar97/OASIS_RoBERTa_for_ERR_one"
-tokenizer = RobertaTokenizer.from_pretrained(url)
-model = RobertaForSequenceClassification.from_pretrained(url)
+tokenizer = RobertaTokenizer.from_pretrained(url, use_auth_token=hf_token)
+model = RobertaForSequenceClassification.from_pretrained(url, use_auth_token=hf_token)
 
 # Check if GPU is available and set the device accordingly
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -39,17 +40,20 @@ model.to(device)
 
 def classify_entities(input_text):
     if '[SEP]' not in input_text:
-        raise ValueError("Input must be formatted with [SEP] to separate parts. Don't include spaces")
+        # raise ValueError("Input must be formatted with [SEP] to separate parts. Don't include spaces")
+        return "Input must be formatted with [SEP] to separate parts. Don't include spaces"
 
     if 'Which one of the following entities is non-redundant and worth retaining? [SEP]' not in input_text:
         input_text = 'Which one of the following entities is non-redundant and worth retaining?[SEP]' + input_text
     else:
-        raise ValueError("Please don't add the question in the input. It will be added automatically.")
+        # raise ValueError("Please don't add the question in the input. It will be added automatically.")
+        return "Please don't add the question in the input. It will be added automatically."
 
     if '[SEP] neither' not in input_text:
         input_text = input_text + '[SEP]neither'
     else:
-        raise ValueError("Please don't add the 'neither' option in the input. It will be added automatically.")
+        # raise ValueError("Please don't add the 'neither' option in the input. It will be added automatically.")
+        return "Please don't add the 'neither' option in the input. It will be added automatically."
 
     # Tokenize the input text
     inputs = tokenizer(input_text, return_tensors="pt", max_length=512, truncation=True, padding="max_length")
