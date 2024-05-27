@@ -13,8 +13,7 @@ from flask import request
 tagger = SequenceTagger.load('ner-ontonotes-large')
 
 from transformers import RobertaTokenizer, RobertaForSequenceClassification
-import torch
-import os
+import torch, os
 
 """## Fine-Tuned RoBERTa for ERR"""
 
@@ -23,8 +22,8 @@ import os
 
 hf_token = os.getenv('HF_TOKEN')
 url="udaykumar97/OASIS_RoBERTa_for_ERR_one"
-tokenizer = RobertaTokenizer.from_pretrained(url, use_auth_token=hf_token)
-model = RobertaForSequenceClassification.from_pretrained(url, use_auth_token=hf_token)
+tokenizer = RobertaTokenizer.from_pretrained(url, token=hf_token)
+model = RobertaForSequenceClassification.from_pretrained(url, token=hf_token)
 
 # Check if GPU is available and set the device accordingly
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
