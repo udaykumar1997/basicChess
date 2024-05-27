@@ -13,22 +13,15 @@ from flask import request
 tagger = SequenceTagger.load('ner-ontonotes-large')
 
 from transformers import RobertaTokenizer, RobertaForSequenceClassification
-import json
-from datasets import Dataset
-from transformers import Trainer, TrainingArguments
-
-from google.colab import userdata
-from huggingface_hub import create_repo, Repository, HfApi, HfFolder
-from requests.exceptions import HTTPError
 import torch
+import os
 
 """## Fine-Tuned RoBERTa for ERR"""
 
 # tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
 # model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=3)  # 2 labels for binary classification
 
-hf_token = userdata.get('HF_TOKEN')
-# url="https://huggingface.co/udaykumar97/OASIS_RoBERTa_for_ERR_one"
+hf_token = os.getenv('HF_TOKEN')
 url="udaykumar97/OASIS_RoBERTa_for_ERR_one"
 tokenizer = RobertaTokenizer.from_pretrained(url, use_auth_token=hf_token)
 model = RobertaForSequenceClassification.from_pretrained(url, use_auth_token=hf_token)
