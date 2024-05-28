@@ -7,7 +7,6 @@ from flask import Flask, jsonify
 from flask import request
 
 import inflect
-p = inflect.engine()
 
 """Load the pre-trained Flair NER (ontonotes-large) model"""
 
@@ -106,6 +105,8 @@ def for_doccano_pre_tagging(single_line_paragraph):
   return response
 
 def standardize_entity_text(entity_text, entity_type):
+  p = inflect.engine()
+  
   # reduce both entity_text and entity_type to lowercase
   entity_text = entity_text.lower()
   entity_type = entity_type.lower()
