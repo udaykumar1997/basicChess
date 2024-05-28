@@ -103,24 +103,58 @@ def for_doccano_pre_tagging(single_line_paragraph):
   return response
 
 def for_ingestion_pipeline(single_line_paragraph):
+  entities, entity_text_only, entity_type_only = [], [], []
+  cannonical_map = {}
+
+  # get entities from Vanilla Flair (ner-ontonotes-large model)
   sentence = Sentence(single_line_paragraph)
   tagger.predict(sentence)
-  entities = []
   for entity in sentence.get_spans('ner'):
-    temp_text = entity.text
-    # replace all occurances of single and double quotes
-    temp_text = temp_text.replace("'", "")
-    entities.append(temp_text)
+    entity_text_temp = entity.text
+    entity_type_temp = entity.labels[0].value
+
+    entity_text_temp, entity_type_temp = standardize_entity_text(entity_text_temp, entity_type_temp)
+
+    entity_text_with_type = entity_text_temp + " (" + entity_type_temp + ")"
+    # entity_text_with_type = entity_text_with_type.replace("'", "") # replace all occurances of single and double quotes
+    entities.append(entity_text_with_type)
+
+    if entity_text_temp not in entity_text_only:
+      entity_text_only.append(entity_text_temp)
+
+    if entity_type_temp not in entity_type_only:
+      entity_type_only.append(entity_type_temp)
+
+    if entity_type_temp in cannonical_map:
+      if entity_text_temp not in cannonical_map[entity_type_temp]:
+        cannonical_map[entity_type_temp].append(entity_text_temp)
+    else:
+      cannonical_map[entity_type_temp] = [entity_text_temp]
 
   results = programatic_taxonomy_detection(single_line_paragraph, custom_startup_taxonomy)
   for result in results:
-    temp_text = result['Text']
-    # replace all occurances of single and double quotes
-    temp_text = temp_text.replace("'", "")
-    entities.append(temp_text)
+    entity_text_temp = result['Text']
+    entity_type_temp = result['Type']
+
+    entity_text_temp, entity_type_temp = standardize_entity_text(entity_text_temp, entity_type_temp)
+
+    entity_text_with_type = entity_text_temp + " (" + entity_type_temp + ")"
+    entities.append(entity_text_with_type)
+
+    if entity_text_temp not in entity_text_only:
+      entity_text_only.append(entity_text_temp)
+
+    if entity_type_temp not in entity_type_only:
+      entity_type_only.append(entity_type_temp)
+
+    if entity_type_temp in cannonical_map:
+      if entity_text_temp not in cannonical_map[entity_type_temp]:
+        cannonical_map[entity_type_temp].append(entity_text_temp)
+    else:
+      cannonical_map[entity_type_temp] = [entity_text_temp]
 
   entities = list(set(entities))
-  response = {"Entities": entities}
+  response = {"Entities": entities, "EntityTextOnly": entity_text_only, "EntityTypeOnly": entity_type_only, "CannonicalMap": cannonical_map}
   return response
 
 """## Flask Code Block"""
