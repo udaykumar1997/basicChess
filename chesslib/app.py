@@ -102,6 +102,28 @@ def for_doccano_pre_tagging(single_line_paragraph):
   response = {"text": single_line_paragraph, "label": entities}
   return response
 
+def standardize_entity_text(entity_text, entity_type):
+  # reduce both entity_text and entity_type to lowercase
+  entity_text = entity_text.lower()
+  entity_type = entity_type.lower()
+
+  # if entity_text is plural, convert it to singular
+  if p.singular_noun(entity_text):
+    entity_text = p.singular_noun(entity_text)
+
+  # remove any leading or trailing whitespaces
+  entity_text = entity_text.strip()
+
+  # remove any leading or trailing single or double quotes
+  entity_text = entity_text.strip("'")
+  entity_text = entity_text.strip('"')
+
+  # remove any occurance of single or double quotes
+  entity_text = entity_text.replace("'", "")
+  entity_text = entity_text.replace('"', '')
+
+  return entity_text, entity_type
+
 def for_ingestion_pipeline(single_line_paragraph):
   entities, entity_text_only, entity_type_only = [], [], []
   cannonical_map = {}
