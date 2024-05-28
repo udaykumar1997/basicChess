@@ -6,6 +6,9 @@ from flair.data import Sentence
 from flask import Flask, jsonify
 from flask import request
 
+import inflect
+p = inflect.engine()
+
 """Load the pre-trained Flair NER (ontonotes-large) model"""
 
 # tagger = SequenceTagger.load('ner')
