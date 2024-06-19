@@ -139,6 +139,10 @@ def for_ingestion_pipeline(single_line_paragraph):
     entity_text_temp = entity.text
     entity_type_temp = entity.labels[0].value
 
+    # if entity_text_temp is 'cardinal' or 'ordinal', skip it
+    if entity_type_temp == 'CARDINAL' or entity_type_temp == 'ORDINAL':
+      continue
+
     entity_text_temp, entity_type_temp = standardize_entity_text(entity_text_temp, entity_type_temp)
 
     entity_text_with_type = entity_text_temp + " (" + entity_type_temp + ")"
