@@ -43,8 +43,9 @@ def classify_entities(input_text):
         # raise ValueError("Please don't add the question in the input. It will be added automatically.")
         return "Please don't add the question in the input. It will be added automatically."
 
-    if '[SEP] neither' not in input_text:
-        input_text = input_text + '[SEP]neither'
+    trailing_option = "[SEP]neither are worth retaining[SEP]both are worth retaining"
+    if trailing_option not in input_text:
+        input_text = input_text + trailing_option
     else:
         # raise ValueError("Please don't add the 'neither' option in the input. It will be added automatically.")
         return "Please don't add the 'neither' option in the input. It will be added automatically."
