@@ -204,27 +204,27 @@ def for_ingestion_pipeline(single_line_paragraph):
   #     cannonical_map[entity_type_temp] = [entity_text_temp]
 
   for taxonomy in custom_taxonomies:
-     results = programatic_taxonomy_detection(single_line_paragraph, globals()[taxonomy])
-      for result in results:
-        entity_text_temp = result['Text']
-        entity_type_temp = result['Type']
+    results = programatic_taxonomy_detection(single_line_paragraph, globals()[taxonomy])
+    for result in results:
+      entity_text_temp = result['Text']
+      entity_type_temp = result['Type']
 
-        entity_text_temp, entity_type_temp = standardize_entity_text(entity_text_temp, entity_type_temp)
+      entity_text_temp, entity_type_temp = standardize_entity_text(entity_text_temp, entity_type_temp)
 
-        entity_text_with_type = entity_text_temp + " (" + entity_type_temp + ")"
-        entities.append(entity_text_with_type)
+      entity_text_with_type = entity_text_temp + " (" + entity_type_temp + ")"
+      entities.append(entity_text_with_type)
 
-        if entity_text_temp not in entity_text_only:
-          entity_text_only.append(entity_text_temp)
+      if entity_text_temp not in entity_text_only:
+        entity_text_only.append(entity_text_temp)
 
-        if entity_type_temp not in entity_type_only:
-          entity_type_only.append(entity_type_temp)
+      if entity_type_temp not in entity_type_only:
+        entity_type_only.append(entity_type_temp)
 
-        if entity_type_temp in cannonical_map:
-          if entity_text_temp not in cannonical_map[entity_type_temp]:
-            cannonical_map[entity_type_temp].append(entity_text_temp)
-        else:
-          cannonical_map[entity_type_temp] = [entity_text_temp]
+      if entity_type_temp in cannonical_map:
+        if entity_text_temp not in cannonical_map[entity_type_temp]:
+          cannonical_map[entity_type_temp].append(entity_text_temp)
+      else:
+        cannonical_map[entity_type_temp] = [entity_text_temp]
 
   entities = list(set(entities))
   response = {"Entities": entities, "EntityTextOnly": entity_text_only, "EntityTypeOnly": entity_type_only, "CannonicalMap": cannonical_map}
