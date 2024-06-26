@@ -82,7 +82,10 @@ def programatic_taxonomy_detection(text, taxonomy_list):
             if start == -1:
                 break
             end = start + len(term)
-            results.append({"Text": term, "Type": taxonomy_list[0], "BeginOffset": start, "EndOffset": end})
+            # if the term is found with a space before and after, it is a whole word match and not a substring
+            if (start == 0 or text[start - 1] == ' ') and (end == len(text) or text[end] == ' '):
+              results.append({"Text": term, "Type": taxonomy_list[0], "BeginOffset": start, "EndOffset": end})
+              
             start += len(term)  # Move start index beyond the current word to avoid overlapping matches
     return results
 
