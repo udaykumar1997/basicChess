@@ -32,6 +32,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Move model to the selected device
 model.to(device)
 
+entity_blacklist = ["of", "the", "a", "an", "and", "or", "but", "so", "for", "to", "in", "on", "at", "by", "with", "from", "as", "into", "onto", "upon", "after", "before", "since", "during", "while", "about", "against", "between", "among", "through", "over", "under", "above", "below", "behind", "beside", "beneath", "around", "near", "off", "out", "up", "down", "away", "back", "forward", "around", "throughout", "within", "without", "inside", "outside", "between", "beyond", ","]
+
 def classify_entities(input_text):
     if '[SEP]' not in input_text:
         # raise ValueError("Input must be formatted with [SEP] to separate parts. Don't include spaces")
@@ -165,7 +167,7 @@ def for_ingestion_pipeline(single_line_paragraph):
     entity_type_temp = entity.labels[0].value
 
     # if entity_text_temp is 'cardinal' or 'ordinal', skip it
-    if entity_type_temp == 'CARDINAL' or entity_type_temp == 'ORDINAL':
+    if entity_type_temp == 'CARDINAL' or entity_type_temp == 'ORDINAL' or entity_text_temp in entity_blacklist:
       continue
 
     entity_text_temp, entity_type_temp = standardize_entity_text(entity_text_temp, entity_type_temp)
