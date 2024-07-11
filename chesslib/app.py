@@ -71,7 +71,7 @@ def classify_entities_and_return_parameters(input_text):
     # Adjust the indexing based on your model's prediction
     result = parts[prediction + 1]  # +1 because index 0 is the question
 
-    res = {'non-redundant': result, 'entity': parts[1], 'other entity': parts[2]}
+    res = {'non_redundant': result, 'entity': parts[1], 'other_entity': parts[2]}
 
     return res
 
