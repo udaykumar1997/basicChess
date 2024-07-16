@@ -302,7 +302,7 @@ def err():
   return non_redundant_entity
 
 @app.route('/err_batch', methods=["POST"])
-def err():
+def err_batch():
   data = request.get_json()
   text = data['text']
   non_redundant_entity = classify_entities_and_return_parameters_batch(text)
