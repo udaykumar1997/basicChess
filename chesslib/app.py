@@ -8,16 +8,8 @@ from flask import request
 
 import sys
 
-# get args from command line
-args = sys.argv
-# check if --worker is in the args
-if '--worker' in args:
-    # get the index of the --worker arg
-    worker_index = args.index('--worker')
-    # get the worker number
-    worker_number = args[worker_index + 1]
-    # set the worker number as the port number
-    num_processes_for_ngrok = int(worker_number)
+# import environment variable 'WORKER' from the shell
+num_processes_for_ngrok = os.getenv('WORKER')
 
 # import inflect
 
