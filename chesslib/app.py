@@ -6,11 +6,6 @@ from flair.data import Sentence
 from flask import Flask, jsonify
 from flask import request
 
-import sys
-
-# import environment variable 'WORKER' from the shell
-num_processes_for_ngrok = os.getenv('WORKER')
-
 # import inflect
 
 """Load the pre-trained Flair NER (ontonotes-large) model"""
@@ -278,8 +273,10 @@ app = Flask(__name__)
 
 @app.route('/', methods=["POST"])
 def hello():
-  data = request.get_json()
-  text = data['text']
+  # data = request.get_json()
+  # text = data['text']
+  # import environment variable 'WORKER' from the shell
+  num_processes_for_ngrok = os.getenv('WORKERS')
   recognized_entities = {"warning": "This is not an active/production endpoint. Production enpoints include 'ingestion_pipeline' and 'doccano_pre_annotation'","num_processes_for_ngrok":num_processes_for_ngrok}
   recognized_entities = jsonify(recognized_entities) # essential because returning a dictionary directly from a Flask route does not automatically convert it to a JSON response
   return recognized_entities
