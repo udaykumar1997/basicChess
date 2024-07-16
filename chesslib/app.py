@@ -6,6 +6,19 @@ from flair.data import Sentence
 from flask import Flask, jsonify
 from flask import request
 
+import sys
+
+# get args from command line
+args = sys.argv
+# check if --worker is in the args
+if '--worker' in args:
+    # get the index of the --worker arg
+    worker_index = args.index('--worker')
+    # get the worker number
+    worker_number = args[worker_index + 1]
+    # set the worker number as the port number
+    num_processes_for_ngrok = int(worker_number)
+
 # import inflect
 
 """Load the pre-trained Flair NER (ontonotes-large) model"""
@@ -275,7 +288,7 @@ app = Flask(__name__)
 def hello():
   data = request.get_json()
   text = data['text']
-  recognized_entities = {"warning": "This is not an active/production endpoint. Production enpoints include 'ingestion_pipeline' and 'doccano_pre_annotation'"}
+  recognized_entities = {"warning": "This is not an active/production endpoint. Production enpoints include 'ingestion_pipeline' and 'doccano_pre_annotation'","num_processes_for_ngrok":num_processes_for_ngrok}
   recognized_entities = jsonify(recognized_entities) # essential because returning a dictionary directly from a Flask route does not automatically convert it to a JSON response
   return recognized_entities
 
