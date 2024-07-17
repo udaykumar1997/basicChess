@@ -37,7 +37,7 @@ entity_blacklist = ["of", "the", "a", "an", "and", "or", "but", "so", "for", "to
 def classify_entities_and_return_parameters_batch(input_text):
     # for each line in the input_text, classify the entities and return the parameters
     results = []
-    for line in input_text.split('\n'):
+    for line in input_text:
       if '[SEP]' not in input_text:
           # raise ValueError("Input must be formatted with [SEP] to separate parts. Don't include spaces")
           return "Input must be formatted with [SEP] to separate parts. Don't include spaces"
@@ -277,6 +277,7 @@ def hello():
   # text = data['text']
   # import environment variable 'WORKER' from the shell
   num_processes_for_ngrok = os.getenv('WORKERS')
+  num_processes_for_ngrok = int(num_processes_for_ngrok)
   recognized_entities = {"warning": "This is not an active/production endpoint. Production enpoints include 'ingestion_pipeline' and 'doccano_pre_annotation'","num_processes_for_ngrok":num_processes_for_ngrok}
   recognized_entities = jsonify(recognized_entities) # essential because returning a dictionary directly from a Flask route does not automatically convert it to a JSON response
   return recognized_entities
