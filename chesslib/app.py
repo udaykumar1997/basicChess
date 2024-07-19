@@ -488,6 +488,8 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             else:
                 print(f"Invalid input source: {input_source}")
                 return entities
+            
+    return entities
 
 
 """## Flask Code Block"""
