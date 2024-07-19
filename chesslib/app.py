@@ -269,9 +269,8 @@ def for_ingestion_pipeline(single_line_paragraph):
   response = {"Entities": entities, "EntityTextOnly": entity_text_only, "EntityTypeOnly": entity_type_only, "CannonicalMap": cannonical_map}
   return response
 
-
 ## Redundant Entity Map implementation
-def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_entities, all_entities, ignore_entity_types, input_source='ingestion', debug_flag=False, debug_level=0):
+def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_entities, all_entities, ignore_entity_types, input_source='ingestion', debug_level=0):
     # replace the redundant entities in the redundant_entity_mapping of all the entities accordingly
     # for entity in tqdm(entities, desc="Optimizing redundant entities NER_tags, NER_tags_with_type and NER_cannonical_map..."):
     for entity in entities:
@@ -282,9 +281,9 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             NER_tags_as_list_of_strings = entity["metadata"]["NER_tags"]
         else:
             print(f"Invalid input source: {input_source}")
-            return entities
+            return
 
-        if debug_flag and debug_level >= 4:
+        if debug_level >= 4:
             print(f"\nstage 1 - NER_tags: {NER_tags_as_list_of_strings}")
         
         # if NER_tags_as_list_of_strings is a string, convert it to a list
@@ -301,7 +300,7 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             print(f"type(NER_tags_as_list_of_strings): {type(NER_tags_as_list_of_strings)}")
             return
 
-        if debug_flag and debug_level >= 4:
+        if debug_level >= 4:
             print(f"stage 2 - NER_tags: {NER_tags_as_list_of_strings}")
         
         updated_NER_tags = NER_tags_as_list_of_strings.copy()
@@ -318,7 +317,7 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
                             if garbage_entity in updated_NER_tags:
                                 updated_NER_tags.remove(garbage_entity)
 
-        if debug_flag and debug_level >= 4:
+        if debug_level >= 4:
             print(f"stage 3 - NER_tags: {updated_NER_tags}")
 
         updated_NER_tags = list(set(updated_NER_tags)) # Ensure uniqueness
@@ -329,9 +328,9 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             entity["metadata"]["NER_tags"] = updated_NER_tags
         else:
             print(f"Invalid input source: {input_source}")
-            return entities
+            return
 
-        if debug_flag and debug_level >= 4:
+        if debug_level >= 4:
             if input_source == 'ingestion':
                 print(f"stage 4 - NER_tags: {entity.metadata['NER_tags']}")
             elif input_source == 'kg':
@@ -347,9 +346,9 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             tags_with_type = entity["metadata"]["NER_tags_with_type"]
         else:
             print(f"Invalid input source: {input_source}")
-            return entities
+            return
         
-        if debug_flag and debug_level >= 4:
+        if debug_level >= 4:
             print(f"\nstage 1 - tags_with_type: {tags_with_type}")
 
         # if tags_with_type is a string, convert it to a list
@@ -384,7 +383,7 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
 
         updated_tags_with_type = list(set(updated_tags_with_type))
 
-        if debug_flag and debug_level >= 4:
+        if debug_level >= 4:
             print(f"stage 3 - tags_with_type: {updated_tags_with_type}")
         
         if input_source == 'ingestion':
@@ -393,7 +392,7 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             entity["metadata"]["NER_tags_with_type"] = updated_tags_with_type
         else:
             print(f"Invalid input source: {input_source}")
-            return entities
+            return
 
         # focus on NER_cannonical_map
         if input_source == 'ingestion':
@@ -402,15 +401,15 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             temp = entity["metadata"]["NER_cannonical_map"]
         else:
             print(f"Invalid input source: {input_source}")
-            return entities
+            return
         
-        if debug_flag and debug_level >= 4:
+        if debug_level >= 4:
             print(f"\nstage 1 - NER_cannonical_map: {temp}")
         
         if type(temp) is str:
             temp = json.loads(temp)
         
-        if debug_flag and debug_level >= 4:
+        if debug_level >= 4:
             print(f"stage 2 - NER_cannonical_map: {temp}")
         
         relevant_entity_types = []
@@ -420,13 +419,13 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
         for entity_type in relevant_entity_types:
             try:
                 for non_redundant_entity, redundant_entities in redundant_entity_mapping.items():
-                    if debug_flag and debug_level >= 5:
+                    if debug_level >= 5:
                         print(f"\nredundant_entity: {redundant_entity}")
                         print(f"temp[entity_type]: {temp[entity_type]}")
                         print(f"entity_type: {entity_type}")
                     for redundant_entity in redundant_entities:
                         if redundant_entity in temp[entity_type]:
-                            if debug_flag and debug_level >= 5:
+                            if debug_level >= 5:
                                 print(f"\nRemoving {redundant_entity} from temp[{entity_type}], and adding {non_redundant_entity}")
 
                             if redundant_entity in temp[entity_type]:
@@ -450,7 +449,7 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
                     print(f"type(entity[\"metadata\"][\"NER_cannonical_map\"]): {type(entity['metadata']['NER_cannonical_map'])}")
                 else:
                     print(f"Invalid input source: {input_source}")
-                    return entities
+                    return
                 print(f"temp: {temp}")
                 print(f"type(temp): {type(temp)}")
                 return
@@ -462,7 +461,7 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
                 entity["metadata"]["NER_cannonical_map"] = temp
             else:
                 print(f"Invalid input source: {input_source}")
-                return entities
+                return
         except Exception as e:
             print(f"Error in updating NER_cannonical_map: {e}")
             print(f"entity_type: {entity_type}")
@@ -480,14 +479,14 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             print(f"type(temp): {type(temp)}")
             return
         
-        if debug_flag and debug_level >= 4:
+        if debug_level >= 4:
             if input_source == 'ingestion':
                 print(f"stage 3 - NER_cannonical_map: {entity.metadata['NER_cannonical_map']}")
             elif input_source == 'kg':
                 print(f"stage 3 - NER_cannonical_map: {entity['metadata']['NER_cannonical_map']}")
             else:
                 print(f"Invalid input source: {input_source}")
-                return entities
+                return
             
     return entities
 
@@ -546,14 +545,11 @@ def optimize_redundant_entities_call():
   all_entities = data['all_entities']
   ignore_entity_types = data['ignore_entity_types']
   input_source = data['input_source']
-  debug_flag = data['debug_flag']
   debug_level = data['debug_level']
   try:
-    entities = optimize_redundant_entities(entities, redundant_entity_mapping, garbage_entities, all_entities, ignore_entity_types, input_source, debug_flag, debug_level)
+    entities = optimize_redundant_entities(entities, redundant_entity_mapping, garbage_entities, all_entities, ignore_entity_types, input_source, debug_level)
   except Exception as e:
     print(str(e))
-    # add error to the entities
-    entities.append({"error": str(e)})
 
   entities = jsonify(entities)
   return entities
