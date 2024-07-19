@@ -550,6 +550,7 @@ def optimize_redundant_entities_call():
     entities = optimize_redundant_entities(entities, redundant_entity_mapping, garbage_entities, all_entities, ignore_entity_types, input_source, debug_level)
   except Exception as e:
     print(str(e))
+    entities.append({"error": str(e)})
 
   entities = jsonify(entities)
   return entities
