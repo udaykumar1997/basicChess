@@ -6,6 +6,8 @@ from flair.data import Sentence
 from flask import Flask, jsonify
 from flask import request
 
+import json, os, tqdm, time
+
 # import inflect
 
 """Load the pre-trained Flair NER (ontonotes-large) model"""
@@ -267,6 +269,227 @@ def for_ingestion_pipeline(single_line_paragraph):
   response = {"Entities": entities, "EntityTextOnly": entity_text_only, "EntityTypeOnly": entity_type_only, "CannonicalMap": cannonical_map}
   return response
 
+
+## Redundant Entity Map implementation
+def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_entities, all_entities, ignore_entity_types, input_source='ingestion', debug_flag=False, debug_level=0):
+    # replace the redundant entities in the redundant_entity_mapping of all the entities accordingly
+    # for entity in tqdm(entities, desc="Optimizing redundant entities NER_tags, NER_tags_with_type and NER_cannonical_map..."):
+    for entity in entities:
+        # focus on NER_tags
+        if input_source == 'ingestion':
+            NER_tags_as_list_of_strings = entity.metadata["NER_tags"]
+        elif input_source == 'kg':
+            NER_tags_as_list_of_strings = entity["metadata"]["NER_tags"]
+        else:
+            print(f"Invalid input source: {input_source}")
+            return entities
+
+        if debug_flag and debug_level >= 4:
+            print(f"\nstage 1 - NER_tags: {NER_tags_as_list_of_strings}")
+        
+        # if NER_tags_as_list_of_strings is a string, convert it to a list
+        try:
+            if type(NER_tags_as_list_of_strings) is str:
+                # convert the NER_tags into a list of strings
+                NER_tags_as_list_of_strings = NER_tags_as_list_of_strings.strip("[").strip("]") # remove the starting and ending square brackets, if present
+                NER_tags_as_list_of_strings = NER_tags_as_list_of_strings.replace("'", "")  # remove single quotes
+                NER_tags_as_list_of_strings = NER_tags_as_list_of_strings.replace("\"", "")  # remove double quotes
+                NER_tags_as_list_of_strings = NER_tags_as_list_of_strings.split(", ")
+        except Exception as e:
+            print(f"Error in converting NER_tags_as_list_of_strings to a list: {e}")
+            print(f"NER_tags_as_list_of_strings: {NER_tags_as_list_of_strings}")
+            print(f"type(NER_tags_as_list_of_strings): {type(NER_tags_as_list_of_strings)}")
+            return
+
+        if debug_flag and debug_level >= 4:
+            print(f"stage 2 - NER_tags: {NER_tags_as_list_of_strings}")
+        
+        updated_NER_tags = NER_tags_as_list_of_strings.copy()
+
+        for current_tag_base in NER_tags_as_list_of_strings:
+            for non_redundant_entity, redundants in redundant_entity_mapping.items():
+                for redundant_entity in redundants:
+                    if current_tag_base == redundant_entity and current_tag_base in all_entities: # 2nd condition: make sure that the entity is present in all_entities, effectively ignoring the entity types in ignore_entity_types
+                        if non_redundant_entity not in updated_NER_tags:
+                            updated_NER_tags.append(non_redundant_entity)
+                        if redundant_entity in updated_NER_tags:
+                            updated_NER_tags.remove(redundant_entity)
+                        for garbage_entity in garbage_entities:
+                            if garbage_entity in updated_NER_tags:
+                                updated_NER_tags.remove(garbage_entity)
+
+        if debug_flag and debug_level >= 4:
+            print(f"stage 3 - NER_tags: {updated_NER_tags}")
+
+        updated_NER_tags = list(set(updated_NER_tags)) # Ensure uniqueness
+
+        if input_source == 'ingestion':
+            entity.metadata["NER_tags"] = updated_NER_tags
+        elif input_source == 'kg':
+            entity["metadata"]["NER_tags"] = updated_NER_tags
+        else:
+            print(f"Invalid input source: {input_source}")
+            return entities
+
+        if debug_flag and debug_level >= 4:
+            if input_source == 'ingestion':
+                print(f"stage 4 - NER_tags: {entity.metadata['NER_tags']}")
+            elif input_source == 'kg':
+                print(f"stage 5 - NER_tags: {entity['metadata']['NER_tags']}")
+            else:
+                print(f"Invalid input source: {input_source}")
+                return entities
+
+        # focus on NER_tags_with_type
+        if input_source == 'ingestion':
+            tags_with_type = entity.metadata["NER_tags_with_type"]
+        elif input_source == 'kg':
+            tags_with_type = entity["metadata"]["NER_tags_with_type"]
+        else:
+            print(f"Invalid input source: {input_source}")
+            return entities
+        
+        if debug_flag and debug_level >= 4:
+            print(f"\nstage 1 - tags_with_type: {tags_with_type}")
+
+        # if tags_with_type is a string, convert it to a list
+        try:
+            if type(tags_with_type) is str:
+                # convert the NER_tags into a list of strings
+                tags_with_type = tags_with_type.strip("[").strip("]") # remove the starting and ending square brackets, if present
+                tags_with_type = tags_with_type.replace("'", "")  # remove single quotes
+                tags_with_type = tags_with_type.replace("\"", "")  # remove double quotes
+                tags_with_type = tags_with_type.split(", ")
+        except Exception as e:
+            print(f"Error in converting tags_with_type to a list: {e}")
+            print(f"tags_with_type: {tags_with_type}")
+            print(f"type(tags_with_type): {type(tags_with_type)}")
+            return
+        
+        updated_tags_with_type = tags_with_type.copy()
+        
+        for tag in tags_with_type:
+            current_tag_base = tag.split(" (")[0]
+            if current_tag_base in all_entities: # make sure that the entity is present in all_entities, effectively ignoring the entity types in ignore_entity_types
+                for non_redundant_entity, redundants in redundant_entity_mapping.items():
+                    if any(current_tag_base == red.split(" (")[0] for red in redundants):
+                        updated_tag = non_redundant_entity + tag[tag.find("(")-1:]  # Preserve type
+                        if updated_tag not in updated_tags_with_type:
+                            updated_tags_with_type.append(updated_tag)
+                        if tag in updated_tags_with_type:
+                            updated_tags_with_type.remove(tag)
+                        for garbage_entity in garbage_entities:
+                            if garbage_entity in updated_tags_with_type:
+                                updated_tags_with_type.remove(garbage_entity)
+
+        updated_tags_with_type = list(set(updated_tags_with_type))
+
+        if debug_flag and debug_level >= 4:
+            print(f"stage 3 - tags_with_type: {updated_tags_with_type}")
+        
+        if input_source == 'ingestion':
+            entity.metadata["NER_tags_with_type"] = updated_tags_with_type
+        elif input_source == 'kg':
+            entity["metadata"]["NER_tags_with_type"] = updated_tags_with_type
+        else:
+            print(f"Invalid input source: {input_source}")
+            return entities
+
+        # focus on NER_cannonical_map
+        if input_source == 'ingestion':
+            temp = entity.metadata["NER_cannonical_map"]
+        elif input_source == 'kg':
+            temp = entity["metadata"]["NER_cannonical_map"]
+        else:
+            print(f"Invalid input source: {input_source}")
+            return entities
+        
+        if debug_flag and debug_level >= 4:
+            print(f"\nstage 1 - NER_cannonical_map: {temp}")
+        
+        if type(temp) is str:
+            temp = json.loads(temp)
+        
+        if debug_flag and debug_level >= 4:
+            print(f"stage 2 - NER_cannonical_map: {temp}")
+        
+        relevant_entity_types = []
+        for entity_type in temp.keys():
+            if entity_type not in ignore_entity_types:
+                relevant_entity_types.append(entity_type)
+        for entity_type in relevant_entity_types:
+            try:
+                for non_redundant_entity, redundant_entities in redundant_entity_mapping.items():
+                    if debug_flag and debug_level >= 5:
+                        print(f"\nredundant_entity: {redundant_entity}")
+                        print(f"temp[entity_type]: {temp[entity_type]}")
+                        print(f"entity_type: {entity_type}")
+                    for redundant_entity in redundant_entities:
+                        if redundant_entity in temp[entity_type]:
+                            if debug_flag and debug_level >= 5:
+                                print(f"\nRemoving {redundant_entity} from temp[{entity_type}], and adding {non_redundant_entity}")
+
+                            if redundant_entity in temp[entity_type]:
+                                temp[entity_type].remove(redundant_entity)
+
+                            if non_redundant_entity not in temp[entity_type]:
+                                temp[entity_type].append(non_redundant_entity)
+                        for garbage_entity in garbage_entities:
+                            if garbage_entity in temp[entity_type]:
+                                temp[entity_type].remove(garbage_entity)
+                
+            except Exception as e:
+                print(f"\nError in processing NER_cannonical_map: {e}")   
+                print(f"entity_type: {entity_type}")
+                print(f"type(entity_type): {type(entity_type)}")
+                if input_source == 'ingestion':
+                    print(f"entity.metadata[\"NER_cannonical_map\"]: {entity.metadata['NER_cannonical_map']}")
+                    print(f"type(entity.metadata[\"NER_cannonical_map\"]): {type(entity.metadata['NER_cannonical_map'])}")
+                elif input_source == 'kg':
+                    print(f"entity[\"metadata\"][\"NER_cannonical_map\"]: {entity['metadata']['NER_cannonical_map']}")
+                    print(f"type(entity[\"metadata\"][\"NER_cannonical_map\"]): {type(entity['metadata']['NER_cannonical_map'])}")
+                else:
+                    print(f"Invalid input source: {input_source}")
+                    return entities
+                print(f"temp: {temp}")
+                print(f"type(temp): {type(temp)}")
+                return
+
+        try:
+            if input_source == 'ingestion':
+                entity.metadata["NER_cannonical_map"] = temp
+            elif input_source == 'kg':
+                entity["metadata"]["NER_cannonical_map"] = temp
+            else:
+                print(f"Invalid input source: {input_source}")
+                return entities
+        except Exception as e:
+            print(f"Error in updating NER_cannonical_map: {e}")
+            print(f"entity_type: {entity_type}")
+            print(f"type(entity_type): {type(entity_type)}")
+            if input_source == 'ingestion':
+                print(f"entity.metadata[\"NER_cannonical_map\"]: {entity.metadata['NER_cannonical_map']}")
+                print(f"type(entity.metadata[\"NER_cannonical_map\"]): {type(entity.metadata['NER_cannonical_map'])}")
+            elif input_source == 'kg':
+                print(f"entity[\"metadata\"][\"NER_cannonical_map\"]: {entity['metadata']['NER_cannonical_map']}")
+                print(f"type(entity[\"metadata\"][\"NER_cannonical_map\"]): {type(entity['metadata']['NER_cannonical_map'])}")
+            else:
+                print(f"Invalid input source: {input_source}")
+                return
+            print(f"temp: {temp}")
+            print(f"type(temp): {type(temp)}")
+            return
+        
+        if debug_flag and debug_level >= 4:
+            if input_source == 'ingestion':
+                print(f"stage 3 - NER_cannonical_map: {entity.metadata['NER_cannonical_map']}")
+            elif input_source == 'kg':
+                print(f"stage 3 - NER_cannonical_map: {entity['metadata']['NER_cannonical_map']}")
+            else:
+                print(f"Invalid input source: {input_source}")
+                return entities
+
+
 """## Flask Code Block"""
 
 app = Flask(__name__)
@@ -311,3 +534,24 @@ def err_batch():
   non_redundant_entity = classify_entities_and_return_parameters_batch(text)
   non_redundant_entity = jsonify(non_redundant_entity) # essential because returning a dictionary directly from a Flask route does not automatically convert it to a JSON response
   return non_redundant_entity
+
+@app.route('/optimize_redundant_entities', methods=["POST"])
+def optimize_redundant_entities_call():
+  data = request.get_json()
+  entities = data['entities']
+  redundant_entity_mapping = data['redundant_entity_mapping']
+  garbage_entities = data['garbage_entities']
+  all_entities = data['all_entities']
+  ignore_entity_types = data['ignore_entity_types']
+  input_source = data['input_source']
+  debug_flag = data['debug_flag']
+  debug_level = data['debug_level']
+  try:
+    entities = optimize_redundant_entities(entities, redundant_entity_mapping, garbage_entities, all_entities, ignore_entity_types, input_source, debug_flag, debug_level)
+  except Exception as e:
+    print(str(e))
+    # add error to the entities
+    entities.append({"error": str(e)})
+
+  entities = jsonify(entities)
+  return entities
