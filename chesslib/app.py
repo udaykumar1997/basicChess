@@ -568,4 +568,5 @@ def fuzzy_batch():
   data = request.get_json()
   call_stack, threshold = data['text'], data['threshold']
   fuzzy_positive_pairs_batch = fuzzy_positive_pairs(call_stack, threshold)
-  non_redundant_entity = jsonify(non_redundant_entity)
+  fuzzy_positive_pairs_batch = jsonify(fuzzy_positive_pairs_batch)
+  return fuzzy_positive_pairs_batch
