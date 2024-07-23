@@ -269,6 +269,14 @@ def for_ingestion_pipeline(single_line_paragraph):
   response = {"Entities": entities, "EntityTextOnly": entity_text_only, "EntityTypeOnly": entity_type_only, "CannonicalMap": cannonical_map}
   return response
 
+from fuzzywuzzy import fuzz
+def fuzzy_positive_pairs(call_stack, threshold):
+    positive_pairs = []
+    for pair in call_stack:
+        if fuzz.ratio(pair[0], pair[1]) >= threshold:
+            positive_pairs.append(pair)
+    return positive_pairs
+
 ## Redundant Entity Map implementation
 def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_entities, all_entities, ignore_entity_types, input_source='ingestion', debug_level=0):
     # replace the redundant entities in the redundant_entity_mapping of all the entities accordingly
@@ -554,3 +562,10 @@ def optimize_redundant_entities_call():
 
   entities = jsonify(entities)
   return entities
+
+@app.route('/fuzzy_batch', methods=["POST"])
+def fuzzy_batch():
+  data = request.get_json()
+  call_stack, threshold = data['text'], data['threshold']
+  fuzzy_positive_pairs_batch = fuzzy_positive_pairs(call_stack, threshold)
+  non_redundant_entity = jsonify(non_redundant_entity)
