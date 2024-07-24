@@ -6,7 +6,8 @@ from flair.data import Sentence
 from flask import Flask, jsonify
 from flask import request
 
-import json, os, tqdm, time
+import json, os, time
+from tqdm import tqdm
 
 # import inflect
 
@@ -270,12 +271,17 @@ def for_ingestion_pipeline(single_line_paragraph):
   return response
 
 from fuzzywuzzy import fuzz
-def fuzzy_positive_pairs(call_stack, threshold):
-    positive_pairs = []
-    for pair in call_stack:
-        if fuzz.ratio(pair[0], pair[1]) >= threshold:
-            positive_pairs.append(pair)
-    return positive_pairs
+def fuzzy_positive_pairs(all_entities, threshold):
+    call_stack = []
+    for entity in tqdm(all_entities, desc="Finding redundant entities..."):
+        for other_entity in all_entities:
+            if other_entity == entity:
+                continue  # Skip self comparison
+
+            if fuzz.ratio(entity, other_entity) >= threshold:
+                call_stack.append((entity, other_entity))
+
+    return call_stack
 
 ## Redundant Entity Map implementation
 def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_entities, all_entities, ignore_entity_types, input_source='ingestion', debug_level=0):
