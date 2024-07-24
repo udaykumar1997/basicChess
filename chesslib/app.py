@@ -274,7 +274,7 @@ def for_ingestion_pipeline(single_line_paragraph):
   return response
 
 from fuzzywuzzy import fuzz
-def fuzzy_positive_pairs(all_entities, threshold):
+def fuzzy_positive_pairs(all_entities, threshold=70):
     call_stack = []
     for entity in tqdm(all_entities, desc="Finding redundant entities..."):
         for other_entity in all_entities:
