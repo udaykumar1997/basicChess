@@ -6,6 +6,9 @@ from flair.data import Sentence
 from flask import Flask, jsonify
 from flask import request
 
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Pool
+
 import json, os, time
 from tqdm import tqdm
 
@@ -571,8 +574,19 @@ def optimize_redundant_entities_call():
 
 @app.route('/fuzzy_batch', methods=["POST"])
 def fuzzy_batch():
-  data = request.get_json()
-  call_stack, threshold = data['text'], data['threshold']
-  fuzzy_positive_pairs_batch = fuzzy_positive_pairs(call_stack, threshold)
-  fuzzy_positive_pairs_batch = jsonify(fuzzy_positive_pairs_batch)
-  return fuzzy_positive_pairs_batch
+    data = request.get_json()
+    all_entities, threshold, num_processes_for_ngrok = data['text'], data['threshold'], data['num_processes_for_ngrok']
+    # split the all_entities into 4 lists and process them in parallel
+    len_all_entities = len(all_entities)
+    num_processes = num_processes_for_ngrok +1
+    chunk_size = len_all_entities // num_processes
+    all_entities_chunks = [all_entities[i:i + chunk_size] for i in range(0, len_all_entities, chunk_size)]
+    # create a pool of workers
+    pool = Pool(processes=num_processes)
+    # map the function to the list of entities
+    fuzzy_positive_pairs_batch = pool.map(fuzzy_positive_pairs, all_entities_chunks)
+    # close the pool
+    pool.close()
+    # fuzzy_positive_pairs_batch = fuzzy_positive_pairs(all_entities, threshold)
+    fuzzy_positive_pairs_batch = jsonify(fuzzy_positive_pairs_batch)
+    return fuzzy_positive_pairs_batch
