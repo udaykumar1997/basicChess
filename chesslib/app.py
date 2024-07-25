@@ -225,7 +225,7 @@ def for_ingestion_pipeline(single_line_paragraph):
     entity_type_temp = entity.labels[0].value
 
     # if entity_text_temp is 'cardinal' or 'ordinal', skip it
-    if entity_type_temp == 'CARDINAL' or entity_type_temp == 'ORDINAL' or entity_type_temp == 'DATE' or entity_type_temp == 'TIME' or entity_type_temp == 'MONEY' or entity_type_temp == 'PERCENT' or entity_text_temp in entity_blacklist:
+    if entity_type_temp == 'CARDINAL' or entity_type_temp == 'ORDINAL' or entity_type_temp == 'DATE' or entity_type_temp == 'TIME' or entity_type_temp == 'MONEY' or entity_type_temp == 'PERCENT' or entity_type_temp == 'QUANTITY' or entity_text_temp in entity_blacklist:
       continue
 
     entity_text_temp, entity_type_temp = standardize_entity_text(entity_text_temp, entity_type_temp)
@@ -281,6 +281,15 @@ def fuzzy_positive_pairs(all_entities, threshold=70):
         temp_all_entities = all_entities.copy()
         temp_all_entities.remove(entity)
         for other_entity in temp_all_entities:
+            if fuzz.ratio(entity, other_entity) >= threshold:
+                call_stack.append((entity, other_entity))
+
+    return call_stack
+
+def fuzzy_positive_pairs_combination(entities_batch_one, entities_batch_two, threshold=70):
+    call_stack = []
+    for entity in tqdm(entities_batch_one, desc="Finding redundant entities..."):
+        for other_entity in entities_batch_two:
             if fuzz.ratio(entity, other_entity) >= threshold:
                 call_stack.append((entity, other_entity))
 
@@ -575,18 +584,15 @@ def optimize_redundant_entities_call():
 @app.route('/fuzzy_batch', methods=["POST"])
 def fuzzy_batch():
     data = request.get_json()
-    all_entities, threshold, num_processes_for_ngrok = data['text'], data['threshold'], data['num_processes_for_ngrok']
-    # split the all_entities into 4 lists and process them in parallel
-    len_all_entities = len(all_entities)
-    num_processes = num_processes_for_ngrok +1
-    chunk_size = len_all_entities // num_processes
-    all_entities_chunks = [all_entities[i:i + chunk_size] for i in range(0, len_all_entities, chunk_size)]
-    # create a pool of workers
-    pool = Pool(processes=num_processes)
-    # map the function to the list of entities
-    fuzzy_positive_pairs_batch = pool.map(fuzzy_positive_pairs, all_entities_chunks)
-    # close the pool
-    pool.close()
-    # fuzzy_positive_pairs_batch = fuzzy_positive_pairs(all_entities, threshold)
+    all_entities, threshold = data['text'], data['threshold']
+    fuzzy_positive_pairs_batch = fuzzy_positive_pairs(all_entities, threshold)
+    fuzzy_positive_pairs_batch = jsonify(fuzzy_positive_pairs_batch)
+    return fuzzy_positive_pairs_batch
+
+@app.route('/fuzzy_batch_combination', methods=["POST"])
+def fuzzy_batch_combination():
+    data = request.get_json()
+    entities_batch_one, entities_batch_two, threshold = data['entities_batch_one'], data['entities_batch_two'], data['threshold']
+    fuzzy_positive_pairs_batch = fuzzy_positive_pairs_combination(entities_batch_one, entities_batch_two, threshold)
     fuzzy_positive_pairs_batch = jsonify(fuzzy_positive_pairs_batch)
     return fuzzy_positive_pairs_batch
