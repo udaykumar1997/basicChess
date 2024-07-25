@@ -225,7 +225,7 @@ def for_ingestion_pipeline(single_line_paragraph):
     entity_type_temp = entity.labels[0].value
 
     # if entity_text_temp is 'cardinal' or 'ordinal', skip it
-    if entity_type_temp == 'CARDINAL' or entity_type_temp == 'ORDINAL' or entity_text_temp in entity_blacklist:
+    if entity_type_temp == 'CARDINAL' or entity_type_temp == 'ORDINAL' or entity_text_temp == 'DATE' or entity_text_temp == 'TIME' or entity_text_temp == 'MONEY' or entity_text_temp == 'PERCENT' or entity_text_temp in entity_blacklist:
       continue
 
     entity_text_temp, entity_type_temp = standardize_entity_text(entity_text_temp, entity_type_temp)
@@ -277,10 +277,10 @@ from fuzzywuzzy import fuzz
 def fuzzy_positive_pairs(all_entities, threshold=70):
     call_stack = []
     for entity in tqdm(all_entities, desc="Finding redundant entities..."):
-        for other_entity in all_entities:
-            if other_entity == entity:
-                continue  # Skip self comparison
-
+        # remove entity from all_entities and save it in a temp variable
+        temp_all_entities = all_entities.copy()
+        temp_all_entities.remove(entity)
+        for other_entity in temp_all_entities:
             if fuzz.ratio(entity, other_entity) >= threshold:
                 call_stack.append((entity, other_entity))
 
