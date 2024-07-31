@@ -229,7 +229,7 @@ def is_entity_garbage(entity_text, entity_type):
         return True
     
     # if entity_text ends with a dot followed by any character
-    if re.search(r'\.\w', entity_text):
+    if re.search(r'\.\w', entity_text) or re.search(r'\.\w\w', entity_text) or re.search(r'\.\w\w\w', entity_text) or re.search(r'\.\w\w\w\w', entity_text):
         return True
     
     if length > 30 and space_count < 1:
