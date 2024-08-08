@@ -212,6 +212,7 @@ def standardize_entity_text(entity_text, entity_type):
   entity_text = entity_text.strip('"')
 
   # remove any occurance of single or double quotes
+  entity_text = entity_text.replace("'s", "")
   entity_text = entity_text.replace("'", "")
   entity_text = entity_text.replace('"', '')
 
@@ -382,7 +383,7 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             if type(NER_tags_as_list_of_strings) is str:
                 # convert the NER_tags into a list of strings
                 NER_tags_as_list_of_strings = NER_tags_as_list_of_strings.strip("[").strip("]") # remove the starting and ending square brackets, if present
-                NER_tags_as_list_of_strings = NER_tags_as_list_of_strings.replace("'s", "")  # remove single quotes                
+                NER_tags_as_list_of_strings = NER_tags_as_list_of_strings.replace("'s", "")  # remove single quotes followed by an 's'
                 NER_tags_as_list_of_strings = NER_tags_as_list_of_strings.replace("'", "")  # remove single quotes
                 NER_tags_as_list_of_strings = NER_tags_as_list_of_strings.replace("\"", "")  # remove double quotes
                 NER_tags_as_list_of_strings = NER_tags_as_list_of_strings.split(", ")
