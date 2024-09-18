@@ -179,6 +179,7 @@ def programatic_taxonomy_detection(text):
         taxonomy_list = taxonomy
     else:
         print("Warning: Custom taxonomy file not found.")
+        taxonomy_list = []
 
     results = []
     for term in taxonomy_list:
