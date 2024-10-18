@@ -645,33 +645,36 @@ def ingestion_pipeline():
 import enchant
 def check_dict_presence(word):
     d = enchant.Dict("en_US")
-    if len(word) == 1:
-        if d.check(word):
-            return (word, True)
-        elif d.check(word.upper()):
-            return (word.upper(), True)
-        elif d.check(word.title()):
-            return (word.title(), True)
+    string_raw = word
+    string_upper = word.upper()
+    string_title = word.title()
+    if len(string_raw) == 1:
+        if d.check(string_raw) or d.check(string_upper) or d.check(string_title):
+            return (word, 1)
+        else:
+            return (word, 0)
     else:
-        constituent_words = word.split()
-        all_valid = all(d.check(w) for w in constituent_words)
-        if all_valid:
-            return (word, all_valid)
-        elif all(d.check(w.upper()) for w in constituent_words):
-            return (word.upper(), all_valid)
-        elif all(d.check(w.title()) for w in constituent_words):
-            return (word.title(), all_valid)
+        constituent_words_r = string_raw.split()
+        constituent_words_u = string_upper.split()
+        constituent_words_t = string_title.split()
+        all_valid_r = all(d.check(w) for w in constituent_words_r)
+        all_valid_u = all(d.check(w) for w in constituent_words_u)
+        all_valid_t = all(d.check(w) for w in constituent_words_t)
 
+        if all_valid_r or all_valid_u or all_valid_t:
+            return (string_raw, 1)
+        else:
+            return (string_raw, 0)
 
 def check_dict_presence_parallel(word_list):
     results = {}
     for word in tqdm(word_list, desc="Checking dictionary presence of batch"):
         try:
             word_result = check_dict_presence(word)
-            results[word_result[0]] = 1 if word_result[1] else 0
+            results[word_result[0]] = word_result[1]
         except Exception as e:
             print(f"Error checking word '{word}': {e}")
-            results[word] = 0
+            results[word] = -2
     return results
 
 @app.route('/err', methods=["POST"])
