@@ -642,6 +642,38 @@ def ingestion_pipeline():
 
   return recognized_entities
 
+import enchant
+def check_dict_presence(word):
+    d = enchant.Dict("en_US")
+    if len(word) == 1:
+        if d.check(word):
+            return (word, True)
+        elif d.check(word.upper()):
+            return (word.upper(), True)
+        elif d.check(word.title()):
+            return (word.title(), True)
+    else:
+        constituent_words = word.split()
+        all_valid = all(d.check(w) for w in constituent_words)
+        if all_valid:
+            return (word, all_valid)
+        elif all(d.check(w.upper()) for w in constituent_words):
+            return (word.upper(), all_valid)
+        elif all(d.check(w.title()) for w in constituent_words):
+            return (word.title(), all_valid)
+
+
+def check_dict_presence_parallel(word_list):
+    results = {}
+    for word in tqdm(word_list, desc="Checking dictionary presence of batch"):
+        try:
+            word_result = check_dict_presence(word)
+            results[word_result[0]] = 1 if word_result[1] else 0
+        except Exception as e:
+            print(f"Error checking word '{word}': {e}")
+            results[word] = 0
+    return results
+
 @app.route('/err', methods=["POST"])
 def err():
   data = request.get_json()
@@ -693,3 +725,11 @@ def fuzzy_batch_combination():
     fuzzy_positive_pairs_batch = fuzzy_positive_pairs_combination(entities_batch_one, entities_batch_two, threshold)
     fuzzy_positive_pairs_batch = jsonify(fuzzy_positive_pairs_batch)
     return fuzzy_positive_pairs_batch
+
+@app.route('/check_spelling', methods=["POST"])
+def check_spelling():
+    data = request.get_json()
+    custom_taxonomy = data['list_of_words_for_spelling_check']
+    ret_str = check_dict_presence_parallel(custom_taxonomy)
+    ret_ret_str = jsonify(ret_str)
+    return ret_ret_str
