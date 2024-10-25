@@ -9,7 +9,7 @@ from flask import request
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Pool
 
-import json, os, time, re
+import json, os, time, re, requests
 from fuzzywuzzy import fuzz
 from tqdm import tqdm
 
@@ -602,6 +602,76 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             
     return entities
 
+def entity_fishing(search_word):
+    # Define the endpoint URL
+    url = "http://localhost:8090/service/disambiguate"
+
+    # Construct the JSON query
+    query = {
+    "text": "",
+    "shortText": search_word,
+    "termVector": [],
+    "language": {
+        "lang": "en"
+    },
+    "entities": [],
+    "mentions": [
+        "ner",
+        "wikipedia"
+    ],
+            }
+
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
+
+    # Send the POST request with JSON data
+    response = requests.post(url, headers=headers, json=query)
+
+    # Check the response status
+    if response.status_code == 200:
+        data = response.json()
+        # Find the entity with the highest confidence score
+        if data.get('entities'):
+            highest_conf_entity = max(
+                data['entities'],
+                key=lambda x: x.get('confidence_score', 0)
+            )
+            highest_raw_name = highest_conf_entity.get('rawName', 'Not Available')
+            highest_confidence = highest_conf_entity.get('confidence_score', 'Not Available')
+            highest_wikidata = highest_conf_entity.get('wikidataId', 'Not Available')
+
+            return (highest_raw_name, highest_confidence, highest_wikidata)
+        else:
+            return None
+
+    else:
+        print(f"Unexpected status code: {response.status_code}")
+        print(response.text)
+        return None
+
+def fish_for_entities(batch_of_entities_to_fish_for):
+    word_freq_dict = {}
+    for key in tqdm(batch_of_entities_to_fish_for, desc="Getting entity fishing info for batch ..."):
+        fish_results = entity_fishing(key)
+        if fish_results:
+            wiki_raw_name, confidence, wikidata_identifier = fish_results
+        else:
+            # convert the key to proper case and try again
+            key_u = key.title()
+            fish_results = entity_fishing(key_u)
+            if fish_results:
+                wiki_raw_name, confidence, wikidata_identifier = fish_results
+
+            else:
+                wiki_raw_name, confidence, wikidata_identifier = "", 0, ""
+
+        word_freq_dict[key]["wiki_raw_name"] = wiki_raw_name
+        word_freq_dict[key]["wiki_ent_confidence"] = confidence
+        word_freq_dict[key]["wikidata_identifier"] = wikidata_identifier 
+
+    return word_freq_dict
 
 """## Flask Code Block"""
 
@@ -736,3 +806,10 @@ def check_spelling():
     ret_str = check_dict_presence_parallel(custom_taxonomy)
     ret_ret_str = jsonify(ret_str)
     return ret_ret_str
+
+@app.route('/entity_fishing_batch', methods=["POST"])
+def entity_fishing_batch_proc():
+    data = request.get_json()
+    entity_fishing_batch = data['list_of_words_for_entity_fishing']
+    resp_batch_list_of_dicts = fish_for_entities(entity_fishing_batch)
+    return jsonify(resp_batch_list_of_dicts)
