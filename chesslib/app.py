@@ -667,6 +667,10 @@ def fish_for_entities(batch_of_entities_to_fish_for):
             else:
                 wiki_raw_name, confidence, wikidata_identifier = "", 0, ""
 
+        # Ensure key has a dictionary entry in word_freq_dict
+        if key not in word_freq_dict:
+            word_freq_dict[key] = {}
+
         word_freq_dict[key]["wiki_raw_name"] = wiki_raw_name
         word_freq_dict[key]["wiki_ent_confidence"] = confidence
         word_freq_dict[key]["wikidata_identifier"] = wikidata_identifier 
