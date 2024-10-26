@@ -9,9 +9,12 @@ from flask import request
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Pool
 
-import json, os, time, re, requests
+import json, os, time, re, requests, json5
 from fuzzywuzzy import fuzz
 from tqdm import tqdm
+
+from ollama import AsyncClient
+import asyncio
 
 # import inflect
 
@@ -677,6 +680,77 @@ def fish_for_entities(batch_of_entities_to_fish_for):
 
     return word_freq_dict
 
+async def is_valid_json(json_str):
+    try:
+        json.loads(json_str)
+        return True
+    except ValueError:
+        return False
+
+num_of_words_in_each_batch = 25
+async def process_batch(batch, batch_number):
+    # system_message = "You will be provided with a list of words and your job is to score them. If the words are dates, money, countries or states, they must have a score of 0. Otherwise, it must be 1. If you're not sure, then it can be in between. Your response must be in the form of JSON dictionary, with the following keys, 'word', 'reason' and 'score'. You must provide these values for each of the words presented to you. The score must be between 0 and 1, and at most 2 decimal places."
+    system_message = """Task: For each word given to you, give it a score in JSON format.   \n1. Scoring Rules:\n   - If the word is a date, amount of money, country, or state, give it a score of 0.\n   - If the word is not one of these, give it a score of 1.\n   - If you're not sure, use a score between 0 and 1, with up to two decimal places. Strictly score 0 ONLY if you're absolutely certain that it's a date, amount of money, country, or state. \n\n2. Response Format: Each word should have a JSON entry with:\n   - `"word"`: the word being scored,\n   - `"reason"`: why you gave that score,\n   - `"score"`: the score itself.\n\nExample of response:\n```json\n[\n  {"word": "France", "reason": "country", "score": 0},\n  {"word": "apple", "reason": "not a date, money, country, or state", "score": 1},\n  {"word": "2022", "reason": "date", "score": 0}\n]\n```"""
+    batch_start_time = time.time()
+
+    client = AsyncClient()
+    msg_list = [
+        {'role': 'system', 'content': system_message},
+        {'role': 'user', 'content': str(batch)}
+    ]
+    
+    print(f"Starting processing for batch {batch_number} with items: {batch}")
+    while True:
+        response = await client.chat(model='nemotron-mini', messages=msg_list)
+        response_content = response['message']['content']
+        
+        if await is_valid_json(response_content):
+            print(f"Model responded with valid JSON for batch {batch_number}")
+            batch_end_time = time.time()
+            diff_time = round(batch_end_time - batch_start_time, 2)
+            print(f"Time taken for batch {batch_number}: {diff_time} seconds")
+            return json.loads(response_content)
+        else:
+            try:
+                parsed_data = json5.loads(response_content)
+                json_output = json.dumps(parsed_data, indent=4)
+                batch_end_time = time.time()
+                print(f"Correction successful for batch {batch_number}")
+                diff_time = round(batch_end_time - batch_start_time, 2)
+                print(f"Time taken for batch {batch_number}: {diff_time} seconds")
+                return json.loads(json_output)
+            except:
+                print(f"Invalid JSON response for batch {batch_number}. Retrying...")
+
+async def run_inference_sequentially(test_list, batch_size=num_of_words_in_each_batch):
+    batches = [test_list[i:i + batch_size] for i in range(0, len(test_list), batch_size)]
+    print(f"Starting sequential inference with {len(batches)} batches...")
+    
+    results = []
+    for i, batch in enumerate(batches):
+        result = await process_batch(batch, i)
+        results.append(result)
+    
+    print("All batches completed.")
+    
+    flat_results = [item for sublist in results for item in sublist if isinstance(item, dict)]
+    flat_results_dict = {}
+    for item in flat_results:
+        word = item.get('word', '')
+        word = word.replace("'", "").replace('"', '')
+        reason = item.get('reason', '')
+        reason = reason.replace("'", "").replace('"', '')
+        score = item.get('score', -1)
+        if score < 0 or score > 1:
+            print(f"\nInvalid score for word '{word}'. item: {item}\n")
+            score = -1
+        flat_results_dict[word] = {
+            'reason': reason,
+            'score': score
+        }
+    
+    return flat_results_dict
+
 """## Flask Code Block"""
 
 app = Flask(__name__)
@@ -715,6 +789,7 @@ def ingestion_pipeline():
   recognized_entities = jsonify(recognized_entities) # essential because returning a dictionary directly from a Flask route does not automatically convert it to a JSON response
 
   return recognized_entities
+
 
 import enchant
 def check_dict_presence(word):
@@ -817,3 +892,14 @@ def entity_fishing_batch_proc():
     entity_fishing_batch = data['list_of_words_for_entity_fishing']
     resp_batch_list_of_dicts = fish_for_entities(entity_fishing_batch)
     return jsonify(resp_batch_list_of_dicts)
+
+@app.route('/run_noise_removal_inference_sequentially', methods=["POST"])
+def run_noise_removal_inference_sequentially_call():
+    data = request.get_json()
+    test_list = data['list_of_words_for_noise_removal']
+    
+    # Execute the asynchronous function synchronously
+    flat_results_json = asyncio.run(run_inference_sequentially(test_list))
+    
+    # Directly return the JSON response
+    return jsonify(flat_results_json)
