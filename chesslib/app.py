@@ -702,8 +702,8 @@ async def process_batch_noise_removal_w_LM(batch, batch_number):
     while True:
         response = await client.chat(model='mistral-nemo', 
                                     messages=msg_list,
-                                    options = {'temperature': 0.4},
-                                    format = "json")
+                                    # format = "json" # returns empty response if set to json, unsure why
+                                    options = {'temperature': 0.4})
         
         # response = await client.chat(model='nemotron-mini', messages=msg_list,
         #                         options = {
@@ -768,7 +768,7 @@ async def run_inference_to_convert_tabular_data_md_2_kvp_dict(input_table_in_mar
     msg_list = [
     {
         'role': 'system',
-        'content': """The input pandas data frames, or markdown tables, are expected to be converted to key-value pairs where the row and column headers are embedded into the key, separated by an underscore. No need to give any other information expect the key-value pairs, with each pair separated by newline. Words like 'header', 'nan', '-' may be found in the input, but they usually indicate a gap in the data, or some placeholder, and are not expected to be included in the key/value."""
+        'content': """The input pandas data frames, or markdown tables, are expected to be converted to key-value pairs where the row and column headers are embedded into the key, separated by an underscore. No need to give any other information expect the key-value pairs, with each pair separated by newline. Words like 'header', 'nan', '-' may be found in the input, but they usually indicate a gap in the data, or some placeholder, and are not expected to be included in the key/value. Don't say stuff like 'Here are the key-value pairs for your data' or anything like that. Just provide the data in the specified format."""
     },
     {
         'role': 'user',
