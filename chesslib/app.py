@@ -687,10 +687,9 @@ async def is_valid_json(json_str):
     except ValueError:
         return False
 
-num_of_words_in_each_batch = 25
-async def process_batch(batch, batch_number):
-    # system_message = "You will be provided with a list of words and your job is to score them. If the words are dates, money, countries or states, they must have a score of 0. Otherwise, it must be 1. If you're not sure, then it can be in between. Your response must be in the form of JSON dictionary, with the following keys, 'word', 'reason' and 'score'. You must provide these values for each of the words presented to you. The score must be between 0 and 1, and at most 2 decimal places."
-    system_message = """Task: For each word given to you, give it a score in JSON format.   \n1. Scoring Rules:\n   - If the word is a date, amount of money, country, or state, give it a score of 0.\n   - If the word is not one of these, give it a score of 1.\n   - If you're not sure, use a score between 0 and 1, with up to two decimal places. Strictly score 0 ONLY if you're absolutely certain that it's a date, amount of money, country, or state. \n\n2. Response Format: Each word should have a JSON entry with:\n   - `"word"`: the word being scored,\n   - `"reason"`: why you gave that score,\n   - `"score"`: the score itself.\n\nExample of response:\n```json\n[\n  {"word": "France", "reason": "country", "score": 0},\n  {"word": "apple", "reason": "not a date, money, country, or state", "score": 1},\n  {"word": "2022", "reason": "date", "score": 0}\n]\n```"""
+num_of_words_in_each_batch = 40
+async def process_batch_noise_removal_w_LM(batch, batch_number):
+    system_message = """Task: For each word given to you, give it a score in JSON format.\nScoring Rules:\n- If the word is a numeric date or a quantified amount of money, give it a score of 0.\n- If the word is not one of these, give it a score of 1.\n- If you're not sure, use a score between 0 and 1, with up to two decimal places. Strictly score 0 ONLY if you're absolutely certain that it's a date or amount of money. \n\nResponse Format: Each word should have a JSON entry with:\n- "word": the word being scored,\n- "reason": why you gave that score,\n- "score": the score itself.\n\nExample of response:\n```json\n[\n  {"word": "congress", "reason": "something political-related, not a date or money", "score": 1},\n  {"word": "5 million", "reason": "amount of money", "score": 0},\n  {"word": "home loan", "reason": "finance-related, but does not contain any quantity of money, nor is it a date", "score": 1},\n  {"word": "Dec-23", "reason": "a date in month-date format", "score": 0},\n  {"word": "fiscal ", "reason": "finance-related, but does not contain any quantity of money, nor is it a date", "score": 1},\n  {"word": "apple", "reason": "looks like a fruit or company, not a date or money", "score": 1},\n  {"word": "2022", "reason": "a year, date", "score": 0},\n  {"word": "labour", "reason": "something work-related, not a date or money", "score": 1},\n  {"word": "5", "reason": "a number, could be a monetary amount", "score": 0},\n  {"word": "USD", "reason": "currency unit, not a date or money", "score": 1},\n  {"word": "2022-12-31", "reason": "a date in year-month-date format", "score": 0},\n  {"word": "labrador", "reason": "a dog breed, not a date or money", "score": 1},\n  {"word": "department", "reason": "something management-related, not a date or money", "score": 1},\n  {"word": "6th January", "reason": "a date in date-month format", "score": 0},\n  {"word": "steve jobs", "reason": "a person, not a date or money", "score": 1},\n  {"word": "india", "reason": "a country, not a date or money", "score": 1},\n  {"word": "united nations", "reason": "an organization, not a date or money", "score": 1}\n]\n```"""
     batch_start_time = time.time()
 
     client = AsyncClient()
@@ -701,7 +700,15 @@ async def process_batch(batch, batch_number):
     
     print(f"Starting processing for batch {batch_number} with items: {batch}")
     while True:
-        response = await client.chat(model='nemotron-mini', messages=msg_list)
+        response = await client.chat(model='mistral-nemo', 
+                                    messages=msg_list,
+                                    options = {'temperature': 0.4},
+                                    format = "json")
+        
+        # response = await client.chat(model='nemotron-mini', messages=msg_list,
+        #                         options = {
+        #                         'temperature': 0.4
+        #                         })
         response_content = response['message']['content']
         
         if await is_valid_json(response_content):
@@ -722,13 +729,13 @@ async def process_batch(batch, batch_number):
             except:
                 print(f"Invalid JSON response for batch {batch_number}. Retrying...")
 
-async def run_inference_sequentially(test_list, batch_size=num_of_words_in_each_batch):
+async def run_inference_sequentially_for_noise_cleaning(test_list, batch_size=num_of_words_in_each_batch):
     batches = [test_list[i:i + batch_size] for i in range(0, len(test_list), batch_size)]
     print(f"Starting sequential inference with {len(batches)} batches...")
     
     results = []
     for i, batch in enumerate(batches):
-        result = await process_batch(batch, i)
+        result = await process_batch_noise_removal_w_LM(batch, i)
         results.append(result)
     
     print("All batches completed.")
@@ -750,6 +757,49 @@ async def run_inference_sequentially(test_list, batch_size=num_of_words_in_each_
         }
     
     return flat_results_dict
+
+
+async def run_inference_to_convert_tabular_data_md_2_kvp_dict(input_table_in_markdown_format):
+    client = AsyncClient()
+    if type(input_table_in_markdown_format) is not str:
+        print(f"Input table is not a string. It's of type {type(input_table_in_markdown_format)}\n   Converting to string...")
+        input_table_in_markdown_format = str(input_table_in_markdown_format)
+
+    msg_list = [
+    {
+        'role': 'system',
+        'content': """The input pandas data frames, or markdown tables, are expected to be converted to key-value pairs where the row and column headers are embedded into the key, separated by an underscore. No need to give any other information expect the key-value pairs, with each pair separated by newline. Words like 'header', 'nan', '-' may be found in the input, but they usually indicate a gap in the data, or some placeholder, and are not expected to be included in the key/value."""
+    },
+    {
+        'role': 'user',
+        'content': "Header 2	NaN	2019 2018 2017 2016	2019 2018 2017 2016	2019 2018 2017 2016	2019 2018 2017 2016	2019 2018 2017 2016	2019 2018 2017 2016	NaN\nHeader 1	Operations (in thousands, except share and per share data) \nNet revenues Cost of goods sold	NaN	$	297,897 198,141	87,934 70,360	$	32,581 34,772	2019 2018 2017 2016 \n$ 16,182 22,494\n0	Gross profit (loss)			99,756	17,574		(2,191)	(6,312)\n1	Research and development expenses			20,650	9,587		5,722	5,782\n2	Selling, general and administrative expenses			74,726	34,461		17,143	12,672"
+    },
+    {
+        'role': 'assistant',
+        'content': "Gross profit (loss), 2019 = 99,756 USD  \nGross profit (loss), 2018 = 17,574 USD  \nGross profit (loss), 2017 = (2,191) USD  \nGross profit (loss), 2016 = (6,312) USD  \nResearch and development expenses, 2019 = 20,650 USD  \nResearch and development expenses, 2018 = 9,587 USD  \nResearch and development expenses, 2017 = 5,722 USD  \nResearch and development expenses, 2016 = 5,782 USD  \nSelling general and administrative expenses, 2019 = 74,726 USD  \nSelling general and administrative expenses, 2018 = 34,461 USD  \nSelling general and administrative expenses, 2017 = 17,143 USD  \nSelling general and administrative expenses, 2016 = 12,672 USD\n"
+    },
+    {
+        'role': 'user',
+        'content': "TOPIC | ACCOUNTING METRIC | SASB CODE | HONEYWELL METRIC1 /DISCLOSURE LOCATION\nGreenhouse Gas Emissions | Gross global Scope 1 emissions; percentage covered under emissions-limiting 1,059,105 metric tons2;\nRT-CH-110a.1\nregulations 2.0% under emissions-limiting regulations |  -  |  - \n -  | Discussion of long-term and short-term strategy or plan to manage Scope 1 emissions,\nRT-CH-110a.2 The Environment\nemissions reduction targets, and an analysis of performance against those targets |  -  |  - \nEnergy Management | (1) total energy consumed, (1) 16,462,506 GJ\n(2) percentage grid electricity, RT-EE-130a.1 (2) 37% grid electricity\n(3) percentage renewable (3) 1% renewable energy |  -  |  - \nWater Management | Total water withdrawn, percentage in regions with High or Extremely High Baseline 20,986 thousand cubic meters3\nRT-CH-140a.1\nWater Stress 23% in water-stressed regions |  -  |  - \n -  | Description of water management risks and discussion of strategies and practices Wastewater and Efful ent Management\nRT-CH-140a.3\nto mitigate those risks and Water Stewardship |  -  |  - \nHazardous Waste Management | Amount of hazardous waste generated RT-CH-150a.1 13,414 metric tons3 |  -  |  - \nWorkforce Health & Safety | Total recordable incident rate (TRIR) for (a) direct employees and (b) contract employees RT-CH-320a.1 0.204 |  -  |  - \n -  | Description of efforts to assess, monitor, and reduce exposure of employees and\nRT-CH-320a.2 Protecting the Workforce\ncontract workers to long-term (chronic) health risks |  -  |  - "
+    },
+    {
+        'role': 'assistant',
+        'content': """Greenhouse Gas Emissions_Gross global Scope 1 emissions = 1,059,105 metric tons\nGreenhouse Gas Emissions_percentage covered under emissions-limiting regulations = 2.0%\nGreenhouse Gas Emissions_SASB Code = RT-CH-110a.1\nGreenhouse Gas Emissions_Honeywell Metric / Disclosure Location = -\n\nGreenhouse Gas Emissions_Strategy or plan to manage Scope 1 emissions = Discussion of long-term and short-term strategy or plan to manage Scope 1 emissions, emissions reduction targets, and an analysis of performance against those targets\nGreenhouse Gas Emissions_SASB Code (strategy) = RT-CH-110a.2\nGreenhouse Gas Emissions_Disclosure Location (strategy) = The Environment\n\nEnergy Management_total energy consumed = 16,462,506 GJ\nEnergy Management_percentage grid electricity = 37%\nEnergy Management_percentage renewable energy = 1%\nEnergy Management_SASB Code = RT-EE-130a.1\nEnergy Management_Honeywell Metric / Disclosure Location = -\n\nWater Management_Total water withdrawn = 20,986 thousand cubic meters\nWater Management_percentage in high or extremely high baseline water stress regions = 23%\nWater Management_SASB Code = RT-CH-140a.1\nWater Management_Honeywell Metric / Disclosure Location = -\n\nWater Management_Description of water management risks and mitigation strategy = Description of water management risks and discussion of strategies and practices to mitigate those risks and Water Stewardship\nWater Management_SASB Code (risks and mitigation) = RT-CH-140a.3\nWater Management_Disclosure Location (risks and mitigation) = Wastewater and Effluent Management\n\nHazardous Waste Management_Amount of hazardous waste generated = 13,414 metric tons\nHazardous Waste Management_SASB Code = RT-CH-150a.1\nHazardous Waste Management_Honeywell Metric / Disclosure Location = -\n\nWorkforce Health & Safety_Total recordable incident rate (TRIR) for direct employees = 0.204\nWorkforce Health & Safety_SASB Code = RT-CH-320a.1\nWorkforce Health & Safety_Honeywell Metric / Disclosure Location = -\n\nWorkforce Health & Safety_Description of efforts to assess, monitor, and reduce exposure to long-term health risks = Description of efforts to assess, monitor, and reduce exposure of employees and contract workers to long-term (chronic) health risks\nWorkforce Health & Safety_SASB Code (health risks) = RT-CH-320a.2\nWorkforce Health & Safety_Disclosure Location (health risks) = Protecting the Workforce\n"""
+    },
+    {
+        'role': 'user',
+        'content': input_table_in_markdown_format
+    }]
+    
+    response = await client.chat(model='mistral-nemo', 
+                        messages=msg_list,
+                        # format='json', # not sure if a JSON format is needed here
+                        options = {'temperature': 0.4})
+
+    response_content = response['message']['content']
+    
+    return response_content
+
 
 """## Flask Code Block"""
 
@@ -899,7 +949,18 @@ def run_noise_removal_inference_sequentially_call():
     test_list = data['list_of_words_for_noise_removal']
     
     # Execute the asynchronous function synchronously
-    flat_results_json = asyncio.run(run_inference_sequentially(test_list))
+    flat_results_json = asyncio.run(run_inference_sequentially_for_noise_cleaning(test_list))
     
     # Directly return the JSON response
     return jsonify(flat_results_json)
+
+@app.route('/run_inference_to_convert_tabular_data_md_2_kvp_dict', methods=["POST"])
+def run_inference_to_convert_tabular_data_md_2_kvp_dict_call():
+    data = request.get_json()
+    input_table_in_markdown_format = data['input_table_in_markdown_format']
+    
+    # Execute the asynchronous function synchronously
+    response_content = asyncio.run(run_inference_to_convert_tabular_data_md_2_kvp_dict(input_table_in_markdown_format))
+    
+    # Directly return the JSON response
+    return jsonify(response_content)
