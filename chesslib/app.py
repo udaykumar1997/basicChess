@@ -18,6 +18,11 @@ import asyncio
 
 # import inflect
 
+try:
+    import tensorflow  # required in Colab to avoid protobuf compatibility issues w/ Wisper
+except ImportError:
+    pass
+
 """Load the pre-trained Flair NER (ontonotes-large) model"""
 
 # tagger = SequenceTagger.load('ner')
@@ -605,7 +610,7 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             
     return entities
 
-def entity_fishing(search_word):
+def entity_fishing_v1_stable(search_word):
     # Define the endpoint URL
     url = "http://localhost:8090/service/disambiguate"
 
@@ -654,21 +659,108 @@ def entity_fishing(search_word):
         print(response.text)
         return None
 
+
+def entity_fishing(search_word):
+    highest_raw_name, highest_confidence, highest_wikidata = None, None, None
+    term_loopup_res_name, term_loopup_res_conf = None, None
+    # Define the endpoint URL
+    disambiguate_url = "http://localhost:8090/service/disambiguate"
+    term_url = f"http://localhost:8090/service/kb/term/{search_word}"
+
+    # Construct the JSON query
+    query_for_disambiguation = {
+    "text": "",
+    "shortText": search_word,
+    "termVector": [],
+    "language": {
+        "lang": "en"
+    },
+    "entities": [],
+    "mentions": [
+        "ner",
+        "wikipedia"
+    ],
+    # "nbest": false,
+    # "sentence": false
+    }
+    query_for_term_lookup = {"term": search_word}
+
+    # Set headers (optional)
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
+
+    # Send the POST request with JSON data
+    try:
+        dist_response = requests.post(disambiguate_url, headers=headers, json=query_for_disambiguation)
+    except Exception as e:
+        print(f"Error with sending POST request for disambiguation: {e}")
+        return None
+    try:
+        tlu_response = requests.get(term_url, headers=headers)
+    except Exception as e:
+        print(f"Error with sending POST request for term look-up: {e}")
+        return None
+    print(f"\n\n")
+    # Check the response status
+    if dist_response.status_code == 200:
+        data = dist_response.json()
+
+        # Find the entity with the highest confidence score
+        if data.get('entities'):
+            highest_conf_entity = max(
+                data['entities'],
+                key=lambda x: x.get('confidence_score', 0)
+            )
+            highest_raw_name = highest_conf_entity.get('rawName', 'Not Available')
+            highest_confidence = highest_conf_entity.get('confidence_score', 'Not Available')
+            highest_wikidata = highest_conf_entity.get('wikidataId', 'Not Available')
+            
+            print("Entity with Highest Confidence Score (Disambiguation):")
+            print(f"rawName: {highest_raw_name}")
+            print(f"confidence_score: {highest_confidence}")
+            print(f"WikidataID: {highest_wikidata}")
+    else:
+        print(f"Unexpected status code for disambiguation: {dist_response.status_code}")
+        print(dist_response.text)
+        return None
+    
+    if tlu_response.status_code == 200:
+        data = tlu_response.json()
+        # Find the entity with the highest confidence score
+        if data.get('senses'):
+            top_res = data['senses']
+            # from top_res, get 'preferred' and 'prob_c' values
+            term_loopup_res_name = top_res[0].get('preferred', 'Not Available')
+            term_loopup_res_conf = top_res[0].get('prob_c', 'Not Available')
+            
+            print("Entity with Highest Confidence Score (Term Lookup):")
+            print(f"rawName: {term_loopup_res_name}")
+            print(f"confidence_score: {term_loopup_res_conf}")
+    else:
+        print(f"Unexpected status code for term look-up: {tlu_response.status_code}")
+        print(tlu_response.text)
+        return None
+        
+    return (highest_raw_name, highest_confidence, highest_wikidata, term_loopup_res_name, term_loopup_res_conf)
+
 def fish_for_entities(batch_of_entities_to_fish_for):
     word_freq_dict = {}
+    fish_results = None
     for key in tqdm(batch_of_entities_to_fish_for, desc="Getting entity fishing info for batch ..."):
         fish_results = entity_fishing(key)
-        if fish_results:
-            wiki_raw_name, confidence, wikidata_identifier = fish_results
-        else:
+        if not fish_results:
             # convert the key to proper case and try again
             key_u = key.title()
             fish_results = entity_fishing(key_u)
-            if fish_results:
-                wiki_raw_name, confidence, wikidata_identifier = fish_results
 
-            else:
-                wiki_raw_name, confidence, wikidata_identifier = "", 0, ""
+        if fish_results:
+            # wiki_raw_name, confidence, wikidata_identifier = fish_results
+            wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = fish_results
+        else:
+            # wiki_raw_name, confidence, wikidata_identifier = "", 0, ""
+            wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = "", 0, "", "", 0
 
         # Ensure key has a dictionary entry in word_freq_dict
         if key not in word_freq_dict:
@@ -676,7 +768,9 @@ def fish_for_entities(batch_of_entities_to_fish_for):
 
         word_freq_dict[key]["wiki_raw_name"] = wiki_raw_name
         word_freq_dict[key]["wiki_ent_confidence"] = confidence
-        word_freq_dict[key]["wikidata_identifier"] = wikidata_identifier 
+        word_freq_dict[key]["wikidata_identifier"] = wikidata_identifier
+        word_freq_dict[key]["term_lookup_name"] = term_loopup_name
+        word_freq_dict[key]["term_lookup_confidence"] = term_loopup_confidence
 
     return word_freq_dict
 
