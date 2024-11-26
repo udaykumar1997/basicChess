@@ -702,7 +702,7 @@ def entity_fishing(search_word):
     except Exception as e:
         print(f"Error with sending POST request for term look-up: {e}")
         return None
-    print(f"\n\n")
+    
     # Check the response status
     if dist_response.status_code == 200:
         data = dist_response.json()
@@ -735,9 +735,9 @@ def entity_fishing(search_word):
             term_loopup_res_name = top_res[0].get('preferred', 'Not Available')
             term_loopup_res_conf = top_res[0].get('prob_c', 'Not Available')
             
-            print("Entity with Highest Confidence Score (Term Lookup):")
-            print(f"rawName: {term_loopup_res_name}")
-            print(f"confidence_score: {term_loopup_res_conf}")
+            # print("Entity with Highest Confidence Score (Term Lookup):")
+            # print(f"rawName: {term_loopup_res_name}")
+            # print(f"confidence_score: {term_loopup_res_conf}")
     else:
         print(f"Unexpected status code for term look-up: {tlu_response.status_code}")
         print(tlu_response.text)
