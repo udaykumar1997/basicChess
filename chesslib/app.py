@@ -749,11 +749,13 @@ def fish_for_entities(batch_of_entities_to_fish_for):
     word_freq_dict = {}
     fish_results = None
     for key in tqdm(batch_of_entities_to_fish_for, desc="Getting entity fishing info for batch ..."):
-        fish_results = entity_fishing(key)
-        if not fish_results:
-            # convert the key to proper case and try again
-            key_u = key.title()
-            fish_results = entity_fishing(key_u)
+        # fish_results = entity_fishing(key)
+        # if not fish_results:
+        #     # convert the key to proper case and try again
+        #     key_u = key.title()
+        #     fish_results = entity_fishing(key_u)
+        key_u = key.title()
+        fish_results = entity_fishing(key_u)
 
         if fish_results:
             # wiki_raw_name, confidence, wikidata_identifier = fish_results
