@@ -717,10 +717,10 @@ def entity_fishing(search_word):
             highest_confidence = highest_conf_entity.get('confidence_score', 'Not Available')
             highest_wikidata = highest_conf_entity.get('wikidataId', 'Not Available')
             
-            print("Entity with Highest Confidence Score (Disambiguation):")
-            print(f"rawName: {highest_raw_name}")
-            print(f"confidence_score: {highest_confidence}")
-            print(f"WikidataID: {highest_wikidata}")
+            # print("Entity with Highest Confidence Score (Disambiguation):")
+            # print(f"rawName: {highest_raw_name}")
+            # print(f"confidence_score: {highest_confidence}")
+            # print(f"WikidataID: {highest_wikidata}")
     else:
         print(f"Unexpected status code for disambiguation: {dist_response.status_code}")
         print(dist_response.text)
