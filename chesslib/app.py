@@ -610,56 +610,6 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             
     return entities
 
-def entity_fishing_v1_stable(search_word):
-    # Define the endpoint URL
-    url = "http://localhost:8090/service/disambiguate"
-
-    # Construct the JSON query
-    query = {
-    "text": "",
-    "shortText": search_word,
-    "termVector": [],
-    "language": {
-        "lang": "en"
-    },
-    "entities": [],
-    "mentions": [
-        "ner",
-        "wikipedia"
-    ],
-            }
-
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json"
-    }
-
-    # Send the POST request with JSON data
-    response = requests.post(url, headers=headers, json=query)
-
-    # Check the response status
-    if response.status_code == 200:
-        data = response.json()
-        # Find the entity with the highest confidence score
-        if data.get('entities'):
-            highest_conf_entity = max(
-                data['entities'],
-                key=lambda x: x.get('confidence_score', 0)
-            )
-            highest_raw_name = highest_conf_entity.get('rawName', 'Not Available')
-            highest_confidence = highest_conf_entity.get('confidence_score', 'Not Available')
-            highest_wikidata = highest_conf_entity.get('wikidataId', 'Not Available')
-
-            return (highest_raw_name, highest_confidence, highest_wikidata)
-        else:
-            return None
-
-    else:
-        print(f"Unexpected status code: {response.status_code}")
-        print(response.text)
-        return None
-
-
 def entity_fishing(search_word):
     highest_raw_name, highest_confidence, highest_wikidata = None, None, None
     term_loopup_res_name, term_loopup_res_conf = None, None
@@ -697,12 +647,7 @@ def entity_fishing(search_word):
     except Exception as e:
         print(f"Error with sending POST request for disambiguation: {e}")
         return None
-    try:
-        tlu_response = requests.get(term_url, headers=headers)
-    except Exception as e:
-        print(f"Error with sending POST request for term look-up: {e}")
-        return None
-    
+
     # Check the response status
     if dist_response.status_code == 200:
         data = dist_response.json()
@@ -724,6 +669,12 @@ def entity_fishing(search_word):
     else:
         print(f"Unexpected status code for disambiguation: {dist_response.status_code}")
         print(dist_response.text)
+        return None
+    
+    try:
+        tlu_response = requests.get(term_url, headers=headers)
+    except Exception as e:
+        print(f"Error with sending POST request for term look-up: {e}")
         return None
     
     if tlu_response.status_code == 200:
@@ -749,13 +700,7 @@ def fish_for_entities(batch_of_entities_to_fish_for):
     word_freq_dict = {}
     fish_results = None
     for key in tqdm(batch_of_entities_to_fish_for, desc="Getting entity fishing info for batch ..."):
-        # fish_results = entity_fishing(key)
-        # if not fish_results:
-        #     # convert the key to proper case and try again
-        #     key_u = key.title()
-        #     fish_results = entity_fishing(key_u)
-        key_u = key.title()
-        fish_results = entity_fishing(key_u)
+        fish_results = entity_fishing(key)
 
         if fish_results:
             # wiki_raw_name, confidence, wikidata_identifier = fish_results
