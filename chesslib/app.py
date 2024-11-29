@@ -702,12 +702,16 @@ def fish_for_entities(batch_of_entities_to_fish_for):
     for key in tqdm(batch_of_entities_to_fish_for, desc="Getting entity fishing info for batch ..."):
         fish_results = entity_fishing(key)
 
-        if fish_results:
-            # wiki_raw_name, confidence, wikidata_identifier = fish_results
+        if fish_results and wiki_raw_name is not None:
             wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = fish_results
         else:
-            # wiki_raw_name, confidence, wikidata_identifier = "", 0, ""
-            wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = "", 0, "", "", 0
+            # title case
+            key_tc = key.title()
+            fish_results = entity_fishing(key_tc)
+            if fish_results:
+                wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = fish_results
+            else:
+                wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = "", 0, "", "", 0
 
         # Ensure key has a dictionary entry in word_freq_dict
         if key not in word_freq_dict:
