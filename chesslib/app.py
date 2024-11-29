@@ -702,7 +702,7 @@ def fish_for_entities(batch_of_entities_to_fish_for):
     for key in tqdm(batch_of_entities_to_fish_for, desc="Getting entity fishing info for batch ..."):
         fish_results = entity_fishing(key)
 
-        if fish_results and wiki_raw_name is not None:
+        if fish_results and fish_results[0] is not None:
             wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = fish_results
         else:
             # title case
