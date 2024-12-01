@@ -610,12 +610,16 @@ def optimize_redundant_entities(entities, redundant_entity_mapping, garbage_enti
             
     return entities
 
-def entity_fishing(search_word):
+def entity_fishing(search_word, check_title_case_for_text_disambiguate=False, check_title_case_for_term_lookup=False, debug=False):
+    if debug:
+        print(f"\n\nsearch_word: {search_word}")
     highest_raw_name, highest_confidence, highest_wikidata = None, None, None
     term_loopup_res_name, term_loopup_res_conf = None, None
     # Define the endpoint URL
     disambiguate_url = "http://localhost:8090/service/disambiguate"
     term_url = f"http://localhost:8090/service/kb/term/{search_word}"
+    search_word_title_case = search_word.title()
+    term_url_title_case = f"http://localhost:8090/service/kb/term/{search_word_title_case}"
 
     # Construct the JSON query
     query_for_disambiguation = {
@@ -630,10 +634,22 @@ def entity_fishing(search_word):
         "ner",
         "wikipedia"
     ],
-    # "nbest": false,
-    # "sentence": false
+    }
+    query_for_disambiguation_title_case = {
+    "text": "",
+    "shortText": search_word_title_case,
+    "termVector": [],
+    "language": {
+        "lang": "en"
+    },
+    "entities": [],
+    "mentions": [
+        "ner",
+        "wikipedia"
+    ],
     }
     query_for_term_lookup = {"term": search_word}
+    query_for_term_lookup_title_case = {"term": search_word_title_case}
 
     # Set headers (optional)
     headers = {
@@ -662,10 +678,40 @@ def entity_fishing(search_word):
             highest_confidence = highest_conf_entity.get('confidence_score', 'Not Available')
             highest_wikidata = highest_conf_entity.get('wikidataId', 'Not Available')
             
-            # print("Entity with Highest Confidence Score (Disambiguation):")
-            # print(f"rawName: {highest_raw_name}")
-            # print(f"confidence_score: {highest_confidence}")
-            # print(f"WikidataID: {highest_wikidata}")
+            if debug:
+                print("Entity with Highest Confidence Score (Disambiguation):")
+                print(f"rawName: {highest_raw_name}")
+                print(f"confidence_score: {highest_confidence}")
+                print(f"WikidataID: {highest_wikidata}")
+        else:
+            if debug:
+                print(f"No entities found in the disambiguation response for '{search_word}'")
+            if check_title_case_for_text_disambiguate:
+                try:
+                    dist_response = requests.post(disambiguate_url, headers=headers, json=query_for_disambiguation_title_case)
+                    if dist_response.status_code == 200:
+                        data = dist_response.json()
+                        if data.get('entities'):
+                            highest_conf_entity = max(
+                                data['entities'],
+                                key=lambda x: x.get('confidence_score', 0)
+                            )
+                            highest_raw_name = highest_conf_entity.get('rawName', 'Not Available')
+                            highest_confidence = highest_conf_entity.get('confidence_score', 'Not Available')
+                            highest_wikidata = highest_conf_entity.get('wikidataId', 'Not Available')
+                            
+                            if debug:
+                                print("Entity with Highest Confidence Score (Disambiguation - Title Case):")
+                                print(f"rawName: {highest_raw_name}")
+                                print(f"confidence_score: {highest_confidence}")
+                                print(f"WikidataID: {highest_wikidata}")
+                        else:
+                            if debug:
+                                print(f"No entities found in the disambiguation response for '{search_word_title_case}'")
+
+                except Exception as e:
+                    print(f"Error with sending POST request for disambiguation (Title Case): {e}")
+                    return None
     else:
         print(f"Unexpected status code for disambiguation: {dist_response.status_code}")
         print(dist_response.text)
@@ -686,9 +732,34 @@ def entity_fishing(search_word):
             term_loopup_res_name = top_res[0].get('preferred', 'Not Available')
             term_loopup_res_conf = top_res[0].get('prob_c', 'Not Available')
             
-            # print("Entity with Highest Confidence Score (Term Lookup):")
-            # print(f"rawName: {term_loopup_res_name}")
-            # print(f"confidence_score: {term_loopup_res_conf}")
+            if debug:
+                print("Entity with Highest Confidence Score (Term Lookup):")
+                print(f"rawName: {term_loopup_res_name}")
+                print(f"confidence_score: {term_loopup_res_conf}")
+        else:
+            if debug:
+                print(f"No entities found in the term look-up response for '{search_word}'")
+            if check_title_case_for_term_lookup:
+                try:
+                    tlu_response = requests.get(term_url_title_case, headers=headers)
+                    if tlu_response.status_code == 200:
+                        data = tlu_response.json()
+                        if data.get('senses'):
+                            top_res = data['senses']
+                            # from top_res, get 'preferred' and 'prob_c' values
+                            term_loopup_res_name = top_res[0].get('preferred', 'Not Available')
+                            term_loopup_res_conf = top_res[0].get('prob_c', 'Not Available')
+                            
+                            if debug:
+                                print("Entity with Highest Confidence Score (Term Lookup - Title Case):")
+                                print(f"rawName: {term_loopup_res_name}")
+                                print(f"confidence_score: {term_loopup_res_conf}")
+                        else:
+                            if debug:
+                                print(f"No entities found in the term look-up response for '{search_word_title_case}'")
+                except Exception as e:
+                    print(f"Error with sending POST request for term look-up (Title Case): {e}")
+                    return None
     else:
         print(f"Unexpected status code for term look-up: {tlu_response.status_code}")
         print(tlu_response.text)
@@ -700,18 +771,22 @@ def fish_for_entities(batch_of_entities_to_fish_for):
     word_freq_dict = {}
     fish_results = None
     for key in tqdm(batch_of_entities_to_fish_for, desc="Getting entity fishing info for batch ..."):
-        fish_results = entity_fishing(key)
+        fish_results = entity_fishing(key, check_title_case_for_text_disambiguate=False, check_title_case_for_term_lookup=True)
 
-        if fish_results and fish_results[0] is not None:
+        if fish_results:
             wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = fish_results
         else:
-            # title case
-            key_tc = key.title()
-            fish_results = entity_fishing(key_tc)
-            if fish_results:
-                wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = fish_results
-            else:
-                wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = "", 0, "", "", 0
+            # if check_title_case_for_text_disambiguate:
+            #     # check for title case hits
+            #     key_tc = key.title()
+            #     fish_results = entity_fishing(key_tc)
+            #     if fish_results:
+            #         wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = fish_results
+            #     else:
+            #         wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = "", 0, "", "", 0
+            # else:
+            # do not check for title case hits
+            wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = "", 0, "", "", 0
 
         # Ensure key has a dictionary entry in word_freq_dict
         if key not in word_freq_dict:
