@@ -764,6 +764,10 @@ def entity_fishing(search_word, check_title_case_for_text_disambiguate=False, ch
         print(f"Unexpected status code for term look-up: {tlu_response.status_code}")
         print(tlu_response.text)
         return None
+
+    # if term_loopup_res_name is suffixed by ' (disambiguation)', or (string) or (film), etc., then remove that suffix
+    if term_loopup_res_name:
+        term_loopup_res_name = re.sub(r" \(.*\)", "", term_loopup_res_name)
         
     return (highest_raw_name, highest_confidence, highest_wikidata, term_loopup_res_name, term_loopup_res_conf)
 
