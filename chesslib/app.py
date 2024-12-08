@@ -775,7 +775,7 @@ def fish_for_entities(batch_of_entities_to_fish_for):
     word_freq_dict = {}
     fish_results = None
     for key in tqdm(batch_of_entities_to_fish_for, desc="Getting entity fishing info for batch ..."):
-        fish_results = entity_fishing(key, check_title_case_for_text_disambiguate=False, check_title_case_for_term_lookup=True)
+        fish_results = entity_fishing(key, check_title_case_for_text_disambiguate=True, check_title_case_for_term_lookup=True)
 
         if fish_results:
             wiki_raw_name, confidence, wikidata_identifier, term_loopup_name, term_loopup_confidence = fish_results
