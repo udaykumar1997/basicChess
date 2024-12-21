@@ -189,11 +189,13 @@ def programatic_taxonomy_detection(text):
         print("Warning: Custom taxonomy file not found.")
         taxonomy_list = []
 
+    text = text.lower()
+
     results = []
     for term in taxonomy_list:
         start = 0
         while True:
-            start = text.find(term, start)
+            start = text.find(term.lower(), start)
             if start == -1:
                 break
             end = start + len(term)
